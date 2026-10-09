@@ -45,7 +45,9 @@ def _role_points(job: Job, profile: Profile) -> tuple[int, str | None]:
 
 
 def _years_asked(job: Job) -> int | None:
-    years = [int(m.group(1)) for m in _YEARS.finditer(job.description[:4000])]
+    # The title counts too: "Lending Product | Experience : 4 -8 yrs" (Paytm, seen live).
+    text = f"{job.title}\n{job.description[:4000]}"
+    years = [int(m.group(1)) for m in _YEARS.finditer(text)]
     return min(years) if years else None
 
 

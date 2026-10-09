@@ -127,3 +127,13 @@ def test_en_dash_range_reads_low_end():
 def test_year_ranges():
     for text in ("3-5 years", "3 – 5 yrs", "3 to 5 years", "3+ years"):
         assert "experience fits (asks ~3 years)" in _scored("Product Manager", text).reasons
+
+
+def test_years_in_title_are_read():
+    # Paytm (live): the years are only in the title; the description never states them.
+    s = _scored(
+        "Product Management - Lending Product | Experience : 4 -8 yrs",
+        "Own the lending product roadmap and work with risk and engineering teams.",
+    )
+    assert s.score <= 45
+    assert any("asks for 4+ years" in f and "capped" in f for f in s.red_flags)

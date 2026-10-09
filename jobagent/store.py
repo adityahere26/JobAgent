@@ -11,6 +11,9 @@ from jobagent.models import JobIn
 
 STATUSES = ("saved", "applied", "interview", "offer", "rejected", "skipped")
 STALE_DAYS = 30
+# Built-in board for jobs the user adds by hand (`jobagent add`). Never fetched, never expired.
+MANUAL_SOURCE = "manual"
+MANUAL_TOKEN = "manual"  # noqa: S105 (a board name, not a secret)
 
 
 @dataclass
@@ -53,10 +56,15 @@ def _job_from_row(row: sqlite3.Row) -> Job:
 
 
 def sync_boards(conn: sqlite3.Connection, boards: list[BoardConfig]) -> None:
-    """Make the boards table match the config. Removed boards are disabled, never deleted."""
+    """Make the boards table match the config. Removed boards are disabled, never deleted.
+
+    The manual board is not in the config and is left alone.
+    """
     with conn:
         wanted = set()
         for b in boards:
+            if b.source == MANUAL_SOURCE:
+                continue  # reserved; a config entry must not disable or rename it
             wanted.add((b.source, b.token))
             conn.execute(
                 "INSERT INTO boards (source, token, company, enabled) VALUES (?, ?, ?, ?) "
@@ -65,12 +73,40 @@ def sync_boards(conn: sqlite3.Connection, boards: list[BoardConfig]) -> None:
                 (b.source, b.token, b.company, int(b.enabled)),
             )
         for row in conn.execute("SELECT id, source, token FROM boards").fetchall():
-            if (row["source"], row["token"]) not in wanted:
+            if row["source"] != MANUAL_SOURCE and (row["source"], row["token"]) not in wanted:
                 conn.execute("UPDATE boards SET enabled = 0 WHERE id = ?", (row["id"],))
 
 
 def enabled_boards(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute("SELECT * FROM boards WHERE enabled = 1 ORDER BY id").fetchall()
+    """Boards to fetch. The manual board has nothing to fetch, so it is never listed."""
+    return conn.execute(
+        "SELECT * FROM boards WHERE enabled = 1 AND source != ? ORDER BY id", (MANUAL_SOURCE,)
+    ).fetchall()
+
+
+def manual_board_id(conn: sqlite3.Connection) -> int:
+    """Id of the built-in manual board, created (and kept enabled) on first use."""
+    with conn:
+        conn.execute(
+            "INSERT INTO boards (source, token, company, enabled) VALUES (?, ?, ?, 1) "
+            "ON CONFLICT (source, token) DO UPDATE SET enabled = 1",
+            (MANUAL_SOURCE, MANUAL_TOKEN, "Added by hand"),
+        )
+    row = conn.execute(
+        "SELECT id FROM boards WHERE source = ? AND token = ?", (MANUAL_SOURCE, MANUAL_TOKEN)
+    ).fetchone()
+    return int(row["id"])
+
+
+def add_manual_job(conn: sqlite3.Connection, job: JobIn) -> tuple[int, str]:
+    """Store a hand-added job. Returns (job id, 'inserted' | 'updated' | 'unchanged')."""
+    board_id = manual_board_id(conn)
+    with conn:
+        outcome = upsert_job(conn, board_id, job, now_iso())
+    row = conn.execute(
+        "SELECT id FROM jobs WHERE board_id = ? AND external_id = ?", (board_id, job.external_id)
+    ).fetchone()
+    return int(row["id"]), outcome
 
 
 def upsert_job(conn: sqlite3.Connection, board_id: int, job: JobIn, seen_at: str) -> str:
@@ -166,8 +202,9 @@ def expire_stale(conn: sqlite3.Connection, days: int = STALE_DAYS) -> int:
     cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="microseconds")
     with conn:
         cur = conn.execute(
-            "UPDATE jobs SET expired_at = ? WHERE expired_at IS NULL AND last_seen_at < ?",
-            (now_iso(), cutoff),
+            "UPDATE jobs SET expired_at = ? WHERE expired_at IS NULL AND last_seen_at < ? "
+            "AND board_id NOT IN (SELECT id FROM boards WHERE source = ?)",
+            (now_iso(), cutoff, MANUAL_SOURCE),
         )
     return cur.rowcount
 

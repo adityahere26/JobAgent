@@ -1,9 +1,12 @@
-"""Command line: init, fetch, rank, show, mark."""
+"""Command line: init, fetch, add, rank, show, mark, tailor, apply."""
 
 import argparse
+import hashlib
 import shutil
 import sys
 from pathlib import Path
+
+from pydantic import ValidationError
 
 from jobagent import __version__, store
 from jobagent.config import (
@@ -17,6 +20,7 @@ from jobagent.config import (
 from jobagent.db import connect
 from jobagent.ingest import ingest_all
 from jobagent.llm import LLMError, make_client
+from jobagent.models import JobIn
 from jobagent.rank import rank_jobs
 from jobagent.report import build_report
 from jobagent.tailor import render, tailor
@@ -65,6 +69,49 @@ def cmd_fetch(paths: Paths, _args: argparse.Namespace) -> int:
                 f"{c['skipped']} skipped, {c['expired']} expired{note}"
             )
     return 1 if failed else 0
+
+
+def _read_description(args: argparse.Namespace) -> str:
+    if args.description_file:
+        return Path(args.description_file).read_text(encoding="utf-8", errors="replace")
+    if sys.stdin.isatty():
+        print("Paste the job description, then press Ctrl-D on a new line:", file=sys.stderr)
+    return sys.stdin.read()
+
+
+def cmd_add(paths: Paths, args: argparse.Namespace) -> int:
+    """Add one job found elsewhere (LinkedIn, Naukri, a company site). The user copies the text."""
+    try:
+        description = _read_description(args)
+    except OSError as exc:
+        print(f"Cannot read the description file: {exc.strerror}", file=sys.stderr)
+        return 1
+    url = args.url.strip()
+    fields = {
+        # Same URL -> same id, so adding a job twice updates it instead of duplicating it.
+        "external_id": "url-" + hashlib.sha256(url.encode("utf-8")).hexdigest()[:16],
+        "title": args.title,
+        "company": args.company,
+        "location_text": args.location,
+        "description": description,
+        "apply_url": url,
+    }
+    try:
+        job = JobIn.model_validate(fields)
+    except ValidationError as exc:
+        print("Job not added:", file=sys.stderr)
+        for err in exc.errors():
+            where = ".".join(str(p) for p in err["loc"]) or "job"
+            print(f"  - {where}: {err['msg']}", file=sys.stderr)
+        return 1
+    conn = connect(paths.db)
+    job_id, outcome = store.add_manual_job(conn, job)
+    verb = {"inserted": "Added", "updated": "Updated", "unchanged": "Already saved:"}[outcome]
+    print(f"{verb} job {job_id}: {job.title} at {job.company}")
+    if not job.description:
+        print("Warning: no description, so skills and experience cannot be scored.")
+    print(f"Next: jobagent rank   or   jobagent show {job_id}")
+    return 0
 
 
 def cmd_rank(paths: Paths, args: argparse.Namespace) -> int:
@@ -189,6 +236,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="create config files from the examples")
     sub.add_parser("fetch", help="download jobs from the boards in companies.yaml")
+    ad = sub.add_parser("add", help="add one job you found elsewhere (you paste the text)")
+    ad.add_argument("--title", required=True)
+    ad.add_argument("--company", required=True)
+    ad.add_argument("--url", required=True, help="https link to the job or application page")
+    ad.add_argument("--location", default=None, help='e.g. "Bengaluru" or "Remote, India"')
+    ad.add_argument(
+        "--description-file", default=None, help="text file with the job description (else stdin)"
+    )
     r = sub.add_parser("rank", help="filter, score and write reports/latest.md")
     r.add_argument("--no-llm", action="store_true", help="heuristic scores only")
     r.add_argument("--limit", type=int, default=50, help="max jobs in the report")
@@ -212,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers = {
         "init": cmd_init,
         "fetch": cmd_fetch,
+        "add": cmd_add,
         "rank": cmd_rank,
         "show": cmd_show,
         "mark": cmd_mark,
