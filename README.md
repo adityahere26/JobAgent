@@ -6,17 +6,15 @@ ranks them against **your** profile, and writes a markdown report. It never appl
 Everything specific to a profession (roles, skills, cities, companies, resume) lives in `config/`.
 To use it for a different profession, change those files only. No code changes.
 
-## Quick start
+## Quick start for a friend
 
 ```bash
-git clone <this repo> && cd jobagent
-uv sync
-uv run jobagent init            # creates config/profile.yaml, companies.yaml, resume.md
-# edit the three files in config/
-uv run jobagent fetch           # download jobs
-uv run jobagent rank            # writes reports/latest.md
-uv run jobagent show 12         # read one job
-uv run jobagent mark 12 applied --note "sent on Monday"
+git clone https://github.com/adityahere26/JobAgent.git jobagent && cd jobagent && uv sync
+uv run jobagent init                # makes your private config files (gitignored)
+# edit config/profile.yaml, config/companies.yaml and config/resume.md for YOUR job hunt
+uv run jobagent fetch               # download jobs from the boards you listed
+uv run jobagent rank --no-llm       # free offline scoring -> reports/latest.md
+uv run jobagent show 12             # read one job; then: uv run jobagent mark 12 applied
 ```
 
 ## Finding boards
