@@ -1,6 +1,7 @@
 """Fetch every enabled board and store the jobs, expiring missing ones only after a trusted run."""
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from pydantic import ValidationError
@@ -8,7 +9,31 @@ from pydantic import ValidationError
 from jobagent import store
 from jobagent.db import now_iso
 from jobagent.models import JobIn
-from jobagent.sources import ADAPTERS, SourceError
+from jobagent.sources import ADAPTERS, FetchResult, SourceAdapter, SourceError
+
+# Boards are downloaded this many at a time; storing stays on the calling thread (SQLite).
+MAX_PARALLEL = 4
+
+
+@dataclass
+class Fetched:
+    """One board's download, done off the main thread. `error` is set if it failed."""
+
+    adapter: SourceAdapter | None
+    result: FetchResult | None = None
+    error: str | None = None
+
+
+def fetch_board(board: sqlite3.Row) -> Fetched:
+    """Network only: safe to run in a worker thread (touches no database)."""
+    adapter_cls = ADAPTERS.get(board["source"])
+    if adapter_cls is None:
+        return Fetched(None, error="unknown source")
+    adapter = adapter_cls()
+    try:
+        return Fetched(adapter, adapter.fetch(board["token"]))
+    except SourceError as exc:
+        return Fetched(adapter, error=str(exc))
 
 
 @dataclass
@@ -19,22 +44,21 @@ class BoardOutcome:
     error: str | None = None
 
 
-def ingest_board(conn: sqlite3.Connection, board: sqlite3.Row) -> BoardOutcome:
-    started = now_iso()
+def ingest_board(
+    conn: sqlite3.Connection,
+    board: sqlite3.Row,
+    fetched: Fetched | None = None,
+    started: str | None = None,
+) -> BoardOutcome:
+    started = started or now_iso()
     counts = {"seen": 0, "inserted": 0, "updated": 0, "unchanged": 0, "skipped": 0, "expired": 0}
-    adapter_cls = ADAPTERS.get(board["source"])
-    if adapter_cls is None:
+    fetched = fetched or fetch_board(board)
+    if fetched.error is not None or fetched.adapter is None or fetched.result is None:
+        error = fetched.error or "unknown source"
         with conn:
-            store.record_run(conn, board["id"], started, "failed", "unknown source", counts)
-        return BoardOutcome(board["company"], "failed", counts, "unknown source")
-    adapter = adapter_cls()
-
-    try:
-        result = adapter.fetch(board["token"])
-    except SourceError as exc:
-        with conn:
-            store.record_run(conn, board["id"], started, "failed", str(exc), counts)
-        return BoardOutcome(board["company"], "failed", counts, str(exc))
+            store.record_run(conn, board["id"], started, "failed", error, counts)
+        return BoardOutcome(board["company"], "failed", counts, error)
+    adapter, result = fetched.adapter, fetched.result
 
     trusted = result.complete
     prior_active = store.active_count(conn, board["id"])
@@ -65,6 +89,17 @@ def ingest_board(conn: sqlite3.Connection, board: sqlite3.Row) -> BoardOutcome:
 
 
 def ingest_all(conn: sqlite3.Connection) -> list[BoardOutcome]:
-    outcomes = [ingest_board(conn, b) for b in store.enabled_boards(conn)]
+    """Download up to MAX_PARALLEL boards at once, then store each on this thread, in order.
+
+    Each board's run starts when the parallel fetch starts; that time is its "unseen" cut-off.
+    """
+    boards = store.enabled_boards(conn)
+    starts = {b["id"]: now_iso() for b in boards}
+    with ThreadPoolExecutor(max_workers=MAX_PARALLEL, thread_name_prefix="board") as pool:
+        downloads = pool.map(fetch_board, boards)
+        outcomes = [
+            ingest_board(conn, b, fetched, starts[b["id"]])
+            for b, fetched in zip(boards, downloads, strict=True)
+        ]
     store.expire_stale(conn)
     return outcomes

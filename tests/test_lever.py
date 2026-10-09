@@ -8,22 +8,10 @@ from pydantic import ValidationError
 from jobagent.models import JobIn
 from jobagent.sources import ADAPTERS, SourceError
 from jobagent.sources.lever import LeverAdapter
+from tests.helpers import json_handler, mock_http
 
 # Field names and types copied from live api.lever.co responses; text shortened and made up.
 POSTINGS = json.loads((Path(__file__).parent / "fixtures/lever/postings.json").read_text())
-
-
-def fake_get(status=200, payload=None, raises=None, seen=None):
-    def get(url, **kw):
-        if seen is not None:
-            seen.append((url, kw.get("params")))
-        if raises:
-            raise raises
-        return httpx.Response(
-            status, content=json.dumps(payload), request=httpx.Request("GET", url)
-        )
-
-    return get
 
 
 def job(index: int) -> JobIn:
@@ -37,14 +25,14 @@ def test_registered():
 
 def test_fetch_full_list_is_complete(monkeypatch):
     seen = []
-    monkeypatch.setattr(httpx, "get", fake_get(payload=POSTINGS, seen=seen))
+    mock_http(monkeypatch, json_handler(payload=POSTINGS, seen=seen))
     r = LeverAdapter().fetch("acme")
     assert r.complete and len(r.listings) == 4 and r.reported_total is None
-    assert seen == [("https://api.lever.co/v0/postings/acme", {"mode": "json"})]
+    assert [str(req.url) for req in seen] == ["https://api.lever.co/v0/postings/acme?mode=json"]
 
 
 def test_non_dict_entry_is_incomplete(monkeypatch):
-    monkeypatch.setattr(httpx, "get", fake_get(payload=[POSTINGS[0], "junk"]))
+    mock_http(monkeypatch, json_handler(payload=[POSTINGS[0], "junk"]))
     r = LeverAdapter().fetch("acme")
     assert not r.complete and len(r.listings) == 1
 
@@ -52,16 +40,19 @@ def test_non_dict_entry_is_incomplete(monkeypatch):
 @pytest.mark.parametrize("status", [404, 500])
 def test_http_errors(monkeypatch, status):
     # Lever answers an unknown company with 404 {"ok": false, "error": "Document not found"}.
-    monkeypatch.setattr(httpx, "get", fake_get(status=status, payload={"ok": False}))
+    mock_http(monkeypatch, json_handler(status=status, payload={"ok": False}))
     with pytest.raises(SourceError):
         LeverAdapter().fetch("acme")
 
 
 def test_network_error_and_bad_shape(monkeypatch):
-    monkeypatch.setattr(httpx, "get", fake_get(raises=httpx.ConnectError("boom")))
+    def refuse(request):
+        raise httpx.ConnectError("boom", request=request)
+
+    mock_http(monkeypatch, refuse)
     with pytest.raises(SourceError):
         LeverAdapter().fetch("acme")
-    monkeypatch.setattr(httpx, "get", fake_get(payload={"ok": False, "error": "x"}))
+    mock_http(monkeypatch, json_handler(payload={"ok": False, "error": "x"}))
     with pytest.raises(SourceError):
         LeverAdapter().fetch("acme")
 

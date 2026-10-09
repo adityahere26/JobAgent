@@ -1,54 +1,44 @@
-import json
-
 import httpx
 import pytest
 
 from jobagent.sources import SourceError
 from jobagent.sources.greenhouse import GreenhouseAdapter
-from tests.helpers import gh_job
-
-
-def fake_get(status=200, payload=None, raises=None):
-    def get(url, **kw):
-        if raises:
-            raise raises
-        return httpx.Response(
-            status, content=json.dumps(payload), request=httpx.Request("GET", url)
-        )
-
-    return get
+from tests.helpers import gh_job, json_handler, mock_http
 
 
 def test_fetch_ok(monkeypatch):
     payload = {"jobs": [gh_job(1)], "meta": {"total": 1}}
-    monkeypatch.setattr(httpx, "get", fake_get(payload=payload))
+    mock_http(monkeypatch, json_handler(payload=payload))
     r = GreenhouseAdapter().fetch("acme")
     assert r.complete and len(r.listings) == 1
 
 
 def test_total_mismatch_is_incomplete(monkeypatch):
     payload = {"jobs": [gh_job(1)], "meta": {"total": 5}}
-    monkeypatch.setattr(httpx, "get", fake_get(payload=payload))
+    mock_http(monkeypatch, json_handler(payload=payload))
     assert not GreenhouseAdapter().fetch("acme").complete
 
 
 def test_non_dict_entry_is_incomplete(monkeypatch):
-    monkeypatch.setattr(httpx, "get", fake_get(payload={"jobs": [gh_job(1), "junk"]}))
+    mock_http(monkeypatch, json_handler(payload={"jobs": [gh_job(1), "junk"]}))
     assert not GreenhouseAdapter().fetch("acme").complete
 
 
 @pytest.mark.parametrize("status", [404, 500])
 def test_http_errors(monkeypatch, status):
-    monkeypatch.setattr(httpx, "get", fake_get(status=status, payload={}))
+    mock_http(monkeypatch, json_handler(status=status, payload={}))
     with pytest.raises(SourceError):
         GreenhouseAdapter().fetch("acme")
 
 
 def test_network_error_and_bad_shape(monkeypatch):
-    monkeypatch.setattr(httpx, "get", fake_get(raises=httpx.ConnectError("boom")))
+    def refuse(request):
+        raise httpx.ConnectError("boom", request=request)
+
+    mock_http(monkeypatch, refuse)
     with pytest.raises(SourceError):
         GreenhouseAdapter().fetch("acme")
-    monkeypatch.setattr(httpx, "get", fake_get(payload={"nope": 1}))
+    mock_http(monkeypatch, json_handler(payload={"nope": 1}))
     with pytest.raises(SourceError):
         GreenhouseAdapter().fetch("acme")
 

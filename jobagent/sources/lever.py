@@ -10,13 +10,10 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-import httpx
-
-from jobagent import __version__
 from jobagent.sources.base import FetchResult, SourceError
+from jobagent.sources.http import get_json
 
 DEFAULT_BASE = "https://api.lever.co"
-TIMEOUT = 15.0
 _DOUBLE_ESCAPED = re.compile(r"&amp;(#?\w+;)")
 
 
@@ -31,18 +28,7 @@ class LeverAdapter:
         ).rstrip("/")
 
     def fetch(self, token: str) -> FetchResult:
-        url = f"{self.base_url}/v0/postings/{token}"
-        headers = {"User-Agent": f"jobagent/{__version__} (personal job search tool)"}
-        try:
-            resp = httpx.get(url, params={"mode": "json"}, headers=headers, timeout=TIMEOUT)
-        except httpx.HTTPError as exc:
-            raise SourceError(f"request failed: {type(exc).__name__}") from exc
-        if resp.status_code != 200:
-            raise SourceError(f"board returned HTTP {resp.status_code}")
-        try:
-            data = resp.json()
-        except ValueError as exc:
-            raise SourceError("board returned invalid JSON") from exc
+        data = get_json(f"{self.base_url}/v0/postings/{token}", {"mode": "json"})
         if not isinstance(data, list):
             raise SourceError("unexpected response shape")
         listings = [p for p in data if isinstance(p, dict)]

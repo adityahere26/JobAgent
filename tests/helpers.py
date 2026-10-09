@@ -1,3 +1,5 @@
+import httpx
+
 from jobagent.config import Profile
 from jobagent.store import Job
 
@@ -36,3 +38,21 @@ def gh_job(id_=1, title="Backend Engineer", loc="Bangalore, India", content="<p>
     }  # fmt: skip
     d.update(o)
     return d
+
+
+_REAL_CLIENT = httpx.Client
+
+
+def mock_http(monkeypatch, handler) -> None:
+    """Route every httpx.Client through `handler(request) -> httpx.Response`. No sockets."""
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(httpx, "Client", lambda **kw: _REAL_CLIENT(transport=transport, **kw))
+
+
+def json_handler(status=200, payload=None, seen=None):
+    def handle(request: httpx.Request) -> httpx.Response:
+        if seen is not None:
+            seen.append(request)
+        return httpx.Response(status, json=payload)
+
+    return handle
