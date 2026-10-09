@@ -230,13 +230,20 @@ def cmd_tailor(paths: Paths, args: argparse.Namespace) -> int:
         return 1
     if not client.is_local:
         print(f"Note: resume text (contacts removed) is sent to {client.host}.", file=sys.stderr)
+    rejected: list[str] = []
     try:
-        result = tailor(client, job, profile, resume)
+        result = tailor(client, job, profile, resume, rejected)
     except (LLMError, ValueError) as exc:
         print(f"Tailoring failed: {exc}", file=sys.stderr)
         return 1
     if result is None:
-        print("The model did not return a usable answer. Try again.", file=sys.stderr)
+        print("The model did not return a usable answer:", file=sys.stderr)
+        for reason in dict.fromkeys(rejected):
+            print(f"  - {reason}", file=sys.stderr)
+        print(
+            f"Try a stronger model, or `jobagent tailor {job.id} --prompt` to use any chat model.",
+            file=sys.stderr,
+        )
         return 1
     out_dir = paths.reports_dir / "tailored"
     out_dir.mkdir(parents=True, exist_ok=True)
