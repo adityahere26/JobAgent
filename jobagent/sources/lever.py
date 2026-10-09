@@ -6,6 +6,7 @@ so a fetch is complete only when the body is a list made entirely of posting obj
 
 import html
 import os
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,6 +17,7 @@ from jobagent.sources.base import FetchResult, SourceError
 
 DEFAULT_BASE = "https://api.lever.co"
 TIMEOUT = 15.0
+_DOUBLE_ESCAPED = re.compile(r"&amp;(#?\w+;)")
 
 
 def _text(value: Any) -> str:
@@ -76,7 +78,8 @@ class LeverAdapter:
                 heading = html.escape(_text(item.get("text")))
                 chunks.append(f"<h3>{heading}</h3><ul>{_text(item.get('content'))}</ul>")
         chunks.append(_text(raw.get("additional")))
-        return "\n".join(c for c in chunks if c)
+        # Some boards (Paytm, seen live) double-escape entities: "&amp;amp;" -> "&amp;".
+        return _DOUBLE_ESCAPED.sub(r"&\1", "\n".join(c for c in chunks if c))
 
     def to_job_fields(self, raw: dict[str, Any], company: str) -> dict[str, Any]:
         categories = raw.get("categories")

@@ -118,3 +118,10 @@ def test_bad_fields_do_not_crash():
     fields = a.to_job_fields(raw, "Acme")
     assert fields["location_text"] is None and fields["posted_at"] is None
     assert fields["description"] == ""
+
+
+def test_double_escaped_entities_are_fixed():
+    # Live Paytm postings send "Scale &amp;amp; Transformation" in their HTML.
+    raw = dict(POSTINGS[1], description="<div>Scale &amp;amp; Transformation &amp;lt;3</div>")
+    d = JobIn.model_validate(LeverAdapter().to_job_fields(raw, "Acme")).description
+    assert "Scale & Transformation" in d and "&amp;" not in d

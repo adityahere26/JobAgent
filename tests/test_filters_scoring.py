@@ -92,3 +92,38 @@ def test_distinctive_word_still_gives_partial_credit():
 def test_full_title_matches_unchanged():
     for title in ("Product Analyst II", "Product Manager, Product Platform", "Product Manager"):
         assert any(r.startswith("title matches") for r in _pm_score(title).reasons), title
+
+
+def _scored(title: str, description: str, years: int = 1):
+    p = make_profile(target_roles=PM_ROLES, experience_years=years, skills=[])
+    job = make_job(title=title, description=description)
+    return score_job(job, p, apply_filters(job, p))
+
+
+# Experience wording copied from live postings.
+def test_over_experienced_jobs_are_capped_at_45():
+    for title, text in (
+        ("Product Manager II", "What you will need - Overall experience of 4+ yrs with at "
+         "least 4+ yrs in product management"),  # Meesho
+        ("Product Manager", "The ideal candidate should have at least 10 years of relevant "
+         "experience"),  # Sigmoid
+    ):  # fmt: skip
+        s = _scored(title, text)
+        assert s.score <= 45, title
+        assert any("score capped at 45" in f for f in s.red_flags), title
+        assert _scored(title, text, years=8).score > 45  # no cap with enough experience
+
+
+def test_en_dash_range_reads_low_end():
+    # Paytm APM: "3–5 years" means 3, which is within 2 of 1 year, so no cap.
+    s = _scored(
+        "Product Management - Associate Product Manager - Travel.",
+        "What We Are Looking For: 1) Around 3–5 years of relevant experience",
+    )
+    assert "experience fits (asks ~3 years)" in s.reasons
+    assert not any("capped" in f for f in s.red_flags) and s.score > 45
+
+
+def test_year_ranges():
+    for text in ("3-5 years", "3 – 5 yrs", "3 to 5 years", "3+ years"):
+        assert "experience fits (asks ~3 years)" in _scored("Product Manager", text).reasons

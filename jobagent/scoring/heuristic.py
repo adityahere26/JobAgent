@@ -7,7 +7,11 @@ from jobagent.config import Profile
 from jobagent.filters import FilterResult, contains_phrase
 from jobagent.store import Job
 
-_YEARS = re.compile(r"(\d{1,2})\s*(?:\+|-\s*\d{1,2})?\s*(?:years|yrs)\b", re.IGNORECASE)
+# "4+ years", "3-5 yrs", "3–5 years" (en dash, seen live), "3 to 5 years": read the low end.
+_YEARS = re.compile(r"(\d{1,2})\s*(?:\+|(?:[-–—]|to)\s*\d{1,2})?\s*(?:years|yrs)\b", re.IGNORECASE)
+# A job asking for more than this many years above yours can score at most _OVER_YEARS_CAP.
+_YEARS_SLACK = 2
+_OVER_YEARS_CAP = 45
 _SENIOR = ("senior", "sr.", "lead", "principal", "staff", "head of", "director", "vp")
 # Words shared by many unrelated roles; they never count towards a partial title match.
 _GENERIC = frozenset(
@@ -40,18 +44,22 @@ def _role_points(job: Job, profile: Profile) -> tuple[int, str | None]:
     return best, label
 
 
-def _experience_points(job: Job, profile: Profile) -> tuple[int, str | None, str | None]:
+def _years_asked(job: Job) -> int | None:
     years = [int(m.group(1)) for m in _YEARS.finditer(job.description[:4000])]
+    return min(years) if years else None
+
+
+def _experience_points(job: Job, profile: Profile) -> tuple[int, str | None, str | None]:
+    need = _years_asked(job)
     title = job.title.lower()
     mine = profile.experience_years
     if any(w in title for w in _SENIOR) and mine < 5:
         return 0, None, "title looks senior for your experience"
     if any(w in title for w in _JUNIOR) and mine >= 4:
         return 0, None, "title looks junior for your experience"
-    if years:
-        need = min(years)
-        if need > mine + 2:
-            return 2, None, f"asks for {need}+ years, you have {mine}"
+    if need is not None:
+        if need > mine + _YEARS_SLACK:
+            return 2, None, None  # flagged and capped in score_job
         return 10, f"experience fits (asks ~{need} years)", None
     return 6, None, None
 
@@ -95,6 +103,14 @@ def score_job(job: Job, profile: Profile, flt: FilterResult) -> Scored:
         # Skills and location alone must not rescue a job whose title is a different role.
         total = min(total, 30)
         out.red_flags.append("title does not match your target roles")
+
+    need = _years_asked(job)
+    if need is not None and need > profile.experience_years + _YEARS_SLACK:
+        total = min(total, _OVER_YEARS_CAP)
+        out.red_flags.append(
+            f"asks for {need}+ years, you have {profile.experience_years} "
+            f"(score capped at {_OVER_YEARS_CAP})"
+        )
 
     out.score = max(0, min(100, total))
     return out
