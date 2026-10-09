@@ -1,0 +1,46 @@
+[project]
+name = "jobagent"
+version = "0.1.0"
+description = "A personal, config-driven job search agent. Finds jobs, ranks them for you, and prepares your applications. Runs on your own machine."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.8",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+apply = ["playwright>=1.45"]
+
+[project.scripts]
+jobagent = "jobagent.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jobagent"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

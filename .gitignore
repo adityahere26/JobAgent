@@ -1,0 +1,21 @@
+# Your personal files. These must NEVER be committed or shared.
+.env
+.env.*
+!.env.example
+config/profile.yaml
+config/companies.yaml
+config/resume.md
+config/applicant.yaml
+# Any PDF anywhere in the project (config/resume.pdf, Your_Name_Resume.pdf, ...)
+*.pdf
+data/
+reports/
+
+# Python / tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.db
+.DS_Store

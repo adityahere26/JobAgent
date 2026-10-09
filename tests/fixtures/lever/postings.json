@@ -1,0 +1,103 @@
+[
+  {
+    "additionalPlain": "About us\nWe build commerce for the next billion users.",
+    "additional": "<div><h3><strong>About us&nbsp;</strong></h3><p>We build commerce for the next billion users.</p></div>",
+    "categories": {
+      "commitment": "Full Time Employee",
+      "department": "Product",
+      "location": "Bangalore, Karnataka",
+      "team": "Product - Growth",
+      "allLocations": ["Bangalore, Karnataka"]
+    },
+    "createdAt": 1757916149833,
+    "descriptionPlain": "About the Team\n\nOwn the seller onboarding funnel. Questions: jobs@example.com",
+    "description": "<div><strong>About the Team</strong><br><br>Own the seller onboarding funnel. Questions: jobs@example.com</div>",
+    "id": "7d9af9b5-c1c7-48ec-bbb5-9b25e49f6596",
+    "lists": [
+      {"text": "What you will do", "content": "\n<li>Write PRDs &amp; run A/B tests</li><li>Work with design and engineering</li>"},
+      {"text": "What you will need", "content": "\n<li>1-3&nbsp;years of product experience</li><li>SQL</li>"}
+    ],
+    "text": "Product Manager I",
+    "country": "IN",
+    "workplaceType": "onsite",
+    "opening": "",
+    "openingPlain": "",
+    "descriptionBody": "<div><strong>About the Team</strong></div>",
+    "descriptionBodyPlain": "About the Team",
+    "hostedUrl": "https://jobs.lever.co/acme/7d9af9b5-c1c7-48ec-bbb5-9b25e49f6596",
+    "applyUrl": "https://jobs.lever.co/acme/7d9af9b5-c1c7-48ec-bbb5-9b25e49f6596/apply"
+  },
+  {
+    "additionalPlain": "",
+    "additional": "",
+    "categories": {
+      "commitment": "Full Time",
+      "department": "Product Management",
+      "location": "Noida, Uttar Pradesh",
+      "team": "Travel",
+      "allLocations": ["Noida, Uttar Pradesh", "Bangalore, Karnataka", "Delhi-NCR", "Thane,Maharashtra"]
+    },
+    "createdAt": 1759300000000,
+    "descriptionPlain": "Associate Product Manager for travel bookings.",
+    "description": "<p>Associate Product Manager for travel bookings.</p>",
+    "id": "4c1e2f00-0000-4000-8000-000000000002",
+    "lists": [],
+    "text": "Product Management - Associate Product Manager - Travel.",
+    "country": "IN",
+    "workplaceType": "remote",
+    "opening": "",
+    "openingPlain": "",
+    "descriptionBody": "<p>Associate Product Manager for travel bookings.</p>",
+    "descriptionBodyPlain": "Associate Product Manager for travel bookings.",
+    "hostedUrl": "https://jobs.lever.co/acme/4c1e2f00-0000-4000-8000-000000000002",
+    "applyUrl": "https://jobs.lever.co/acme/4c1e2f00-0000-4000-8000-000000000002/apply"
+  },
+  {
+    "additionalPlain": "",
+    "additional": "",
+    "categories": {
+      "commitment": "Full Time",
+      "department": "Sales",
+      "location": "East Coast",
+      "team": "Enterprise",
+      "allLocations": ["East Coast"]
+    },
+    "createdAt": 1758000000000,
+    "descriptionPlain": "Sell to US banks.",
+    "description": "<p>Sell to US banks.</p>",
+    "id": "f43a0000-0000-4000-8000-000000000003",
+    "lists": [],
+    "text": "Product Manager, Card Issuing",
+    "country": "US",
+    "workplaceType": "remote",
+    "opening": "",
+    "openingPlain": "",
+    "descriptionBody": "<p>Sell to US banks.</p>",
+    "descriptionBodyPlain": "Sell to US banks.",
+    "hostedUrl": "https://jobs.lever.co/acme/f43a0000-0000-4000-8000-000000000003",
+    "applyUrl": "https://jobs.lever.co/acme/f43a0000-0000-4000-8000-000000000003/apply"
+  },
+  {
+    "additionalPlain": "",
+    "additional": "",
+    "categories": {
+      "department": "Product",
+      "location": "Hyderabad/Bangalore",
+      "team": "Platform"
+    },
+    "createdAt": 1758500000000,
+    "descriptionPlain": "Platform product role.",
+    "description": "<p>Platform product role.</p>",
+    "id": "2d5b0000-0000-4000-8000-000000000004",
+    "lists": [],
+    "text": "Product Manager II",
+    "country": "IN",
+    "workplaceType": "hybrid",
+    "opening": "",
+    "openingPlain": "",
+    "descriptionBody": "<p>Platform product role.</p>",
+    "descriptionBodyPlain": "Platform product role.",
+    "hostedUrl": "https://jobs.lever.co/acme/2d5b0000-0000-4000-8000-000000000004",
+    "applyUrl": "https://jobs.lever.co/acme/2d5b0000-0000-4000-8000-000000000004/apply"
+  }
+]

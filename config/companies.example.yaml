@@ -1,0 +1,15 @@
+# Company job boards to check. `jobagent init` copies this to config/companies.yaml (gitignored).
+#
+# Greenhouse: open a company's careers page. If its address looks like
+#   https://boards.greenhouse.io/<token>   or   https://job-boards.greenhouse.io/<token>
+# then <token> is what you put below. Only letters, digits, "_" and "-" are allowed.
+#
+# Greenhouse and similar systems are mostly used by tech companies and startups. For other
+# professions you will need other sources; see README "Adding a source".
+
+boards: []
+
+# boards:
+#   - source: greenhouse
+#     token: examplecorp
+#     company: ExampleCorp

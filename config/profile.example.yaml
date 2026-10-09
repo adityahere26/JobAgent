@@ -1,0 +1,57 @@
+# Your profile. `jobagent init` copies this to config/profile.yaml, which is gitignored.
+# Edit it for YOUR profession. Nothing else in the project needs to change.
+
+name: Your Name                 # shown in reports only
+summary: >
+  One short paragraph, in your own words, about the work you want next.
+
+# Words matched against job titles. Use the titles you would actually apply to.
+target_roles:
+  - Data Analyst
+  - Business Analyst
+
+# Keywords you want to see in the job description (tools, methods, certifications...).
+skills:
+  - SQL
+  - Excel
+  - Power BI
+
+# If set, a job must mention at least one of these somewhere, or it is skipped.
+must_have_any: []
+
+# Skip jobs whose TITLE contains any of these words.
+avoid_in_title:
+  - senior
+  - lead
+  - principal
+  - director
+  - head
+  - intern
+
+avoid_companies: []
+
+experience_years: 3
+
+# Cities you would work from. Add "Remote" if remote jobs are fine.
+locations:
+  - Pune
+  - Bengaluru
+  - Remote
+
+# Two-letter country codes. A job located only in other countries is skipped.
+countries:
+  - IN
+
+resume_file: config/resume.md   # plain text or markdown
+
+# Jobs scoring below this (0-100) are left out of the report.
+min_score: 35
+
+# Optional AI scoring. "none" uses only the free built-in scorer.
+#   ollama             -> a model running on your own machine (private)
+#   openai_compatible  -> any provider with an OpenAI-style API (put the key in .env as LLM_API_KEY)
+llm:
+  provider: none
+  model: ""
+  base_url: ""
+  top_n: 30                     # at most this many jobs per run are sent to the AI

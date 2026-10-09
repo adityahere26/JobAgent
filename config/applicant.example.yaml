@@ -1,0 +1,10 @@
+# Details used to pre-fill application forms. Stays on your machine (gitignored).
+first_name: ""
+last_name: ""
+email: ""
+phone: ""
+location: ""          # e.g. Bengaluru, India
+linkedin: ""          # full https URL
+github: ""
+portfolio: ""
+resume_pdf: ""        # path to your resume PDF, e.g. config/resume.pdf
