@@ -95,33 +95,66 @@ def build_prompt(job: Job, profile: Profile, resume: str, bullets: list[str]) ->
     )
 
 
-def tailor(client: LLMClient, job: Job, profile: Profile, resume: str) -> Tailored | None:
+@dataclass
+class Prepared:
+    """Everything a tailoring attempt needs, built once from local files. No network."""
+
+    bullets: list[str]
+    prompt: str
+    allowed: str
+
+
+def prepare(job: Job, profile: Profile, resume: str) -> Prepared:
     bullets = resume_bullets(resume)
     if not bullets:
         raise ValueError("resume.md has no bullet lines ('- ...') to choose from")
-    prompt = build_prompt(job, profile, resume, bullets)
     allowed = f"{resume}\n{profile.name} {profile.summary} {' '.join(profile.skills)} "
     allowed += f"{' '.join(profile.target_roles)} {job.title} {job.company}"
+    return Prepared(bullets, build_prompt(job, profile, resume, bullets), allowed)
 
+
+def check_reply(text: str, prep: Prepared) -> Tailored:
+    """Parse a model reply (from any source) and run the grounding check. Raises ValueError."""
+    out = parse(text)
+    picked = [
+        prep.bullets[n - 1]
+        for n in dict.fromkeys(out.bullet_numbers)
+        if 1 <= n <= len(prep.bullets)
+    ]
+    result = Tailored(out.summary.strip(), picked, out.cover_note.strip())
+    bad = ungrounded_terms(f"{out.summary}\n{out.cover_note}", prep.allowed)
+    if bad:
+        result.warnings.append("Not found in your resume (check before using): " + ", ".join(bad))
+    return result
+
+
+def tailor(client: LLMClient, job: Job, profile: Profile, resume: str) -> Tailored | None:
+    prep = prepare(job, profile, resume)
     best: Tailored | None = None
     for _ in range(2):
         try:
-            out = parse(client.complete(SYSTEM, prompt, TailorOut.model_json_schema()))
+            result = check_reply(
+                client.complete(SYSTEM, prep.prompt, TailorOut.model_json_schema()), prep
+            )
         except ValueError:
             continue
-        picked = [
-            bullets[n - 1] for n in dict.fromkeys(out.bullet_numbers) if 1 <= n <= len(bullets)
-        ]
-        bad = ungrounded_terms(f"{out.summary}\n{out.cover_note}", allowed)
-        result = Tailored(out.summary.strip(), picked, out.cover_note.strip())
-        if bad:
-            result.warnings.append(
-                "Not found in your resume (check before using): " + ", ".join(bad)
-            )
-        if not bad:
+        if not result.warnings:
             return result
         best = best or result
     return best
+
+
+def render_prompt(job: Job, prep: Prepared) -> str:
+    """A prompt to paste into any chat model by hand (`jobagent tailor <id> --prompt`)."""
+    return (
+        f"# Tailoring prompt for {job.title} at {job.company}\n\n"
+        "Paste everything below the line into a chat model you trust. Save its whole reply to a\n"
+        f"text file, then run: `jobagent tailor {job.id} --import reply.txt`\n\n"
+        "Contact details were removed from your resume. Job text is fenced between <<<JOB and\n"
+        "JOB>>> and the model is told not to follow instructions inside it.\n\n"
+        "---\n\n"
+        f"INSTRUCTIONS\n{SYSTEM}\n\n{prep.prompt}\n"
+    )
 
 
 def render(job: Job, t: Tailored) -> str:

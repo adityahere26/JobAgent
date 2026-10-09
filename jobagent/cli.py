@@ -12,6 +12,7 @@ from jobagent import __version__, store
 from jobagent.config import (
     ConfigError,
     Paths,
+    Profile,
     load_boards,
     load_dotenv,
     load_profile,
@@ -23,7 +24,7 @@ from jobagent.llm import LLMError, make_client
 from jobagent.models import JobIn
 from jobagent.rank import rank_jobs
 from jobagent.report import build_report
-from jobagent.tailor import render, tailor
+from jobagent.tailor import check_reply, prepare, render, render_prompt, tailor
 
 EXAMPLES = {
     "profile.example.yaml": "profile.yaml",
@@ -167,12 +168,53 @@ def cmd_mark(paths: Paths, args: argparse.Namespace) -> int:
     return 0
 
 
+def _tailor_offline(paths: Paths, args: argparse.Namespace, profile: Profile, resume: str) -> int:
+    """--prompt writes a prompt to paste anywhere; --import checks the pasted reply. No network."""
+    conn = connect(paths.db)
+    job = store.get_job(conn, args.job_id)
+    if job is None:
+        print(f"No job with id {args.job_id}.")
+        return 1
+    try:
+        prep = prepare(job, profile, resume)
+    except ValueError as exc:
+        print(f"Cannot tailor: {exc}", file=sys.stderr)
+        return 1
+    out_dir = paths.reports_dir / "tailored"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if args.prompt:
+        out = out_dir / f"job-{job.id}.prompt.md"
+        out.write_text(render_prompt(job, prep), encoding="utf-8")
+        print(f"Saved: {out}")
+        print("Paste it into a chat model and save the reply, then run:")
+        print(f"  jobagent tailor {job.id} --import reply.txt")
+        return 0
+    try:
+        reply = Path(args.import_file).read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        print(f"Cannot read the reply file: {exc.strerror}", file=sys.stderr)
+        return 1
+    try:
+        result = check_reply(reply, prep)
+    except ValueError as exc:
+        print(f"The reply is not usable: {exc}. It must be the JSON object.", file=sys.stderr)
+        return 1
+    out = out_dir / f"job-{job.id}.md"
+    out.write_text(render(job, result), encoding="utf-8")
+    for w in result.warnings:
+        print(f"WARNING: {w}")
+    print(f"Saved: {out}")
+    return 0
+
+
 def cmd_tailor(paths: Paths, args: argparse.Namespace) -> int:
     profile = load_profile(paths)
     resume = read_resume(paths, profile)
     if not resume.strip():
         print("config/resume.md is empty or missing.", file=sys.stderr)
         return 1
+    if args.prompt or args.import_file:
+        return _tailor_offline(paths, args, profile, resume)
     try:
         client = make_client(profile.llm)
     except LLMError as exc:
@@ -251,6 +293,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("job_id", type=int)
     t = sub.add_parser("tailor", help="draft summary, bullets and cover note for one job")
     t.add_argument("job_id", type=int)
+    offline = t.add_mutually_exclusive_group()
+    offline.add_argument(
+        "--prompt", action="store_true", help="write a prompt to paste into any chat model"
+    )
+    offline.add_argument(
+        "--import", dest="import_file", metavar="REPLY", help="check a pasted model reply"
+    )
     a = sub.add_parser("apply", help="open the form in a browser and pre-fill it (you submit)")
     a.add_argument("job_id", type=int)
     m = sub.add_parser("mark", help="track a job's status")

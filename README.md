@@ -60,7 +60,7 @@ example "asks for 4+ years, you have 1") stays capped whatever the AI says.
 ## Limits (v0.1)
 - Sources: Greenhouse and Lever, plus jobs you add by hand. Adding another is one file in `jobagent/sources/`.
 - The Greenhouse and Lever adapters have been run against the live services; tests use offline fixtures shaped like their real responses.
-- `jobagent tailor <id>` drafts a summary, picks your most relevant bullets (verbatim) and a cover note; numbers or names not found in your resume are flagged. Needs an LLM.
+- `jobagent tailor <id>` drafts a summary, picks your most relevant bullets (verbatim) and a cover note; numbers or names not found in your resume are flagged. Needs an LLM, or use `jobagent tailor <id> --prompt` to get a prompt you paste into any chat model, then `jobagent tailor <id> --import reply.txt` to check its reply the same way (no API, no network).
 - `jobagent apply <id>` opens the application page in a visible browser and pre-fills name, email, phone, links, resume PDF and (if you ran `tailor`) the cover note, from `config/applicant.yaml`. It never clicks submit, never ticks checkboxes (consents, legal, diversity), and leaves unsure fields empty. You review and submit. Needs `uv sync --extra apply`.
 - Many career sites (Workday, login walls, CAPTCHAs) will only be partly filled; that is expected.
 
