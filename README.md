@@ -44,6 +44,12 @@ Without it, ranking is a free offline keyword score. To add an AI opinion on the
   Your profile and resume (emails and phones removed) are sent to that provider, and some free tiers
   use submitted data to improve their products. Use Ollama if that matters to you.
 
+**Honest advice:** small local models (3B) rank worse than the free keyword score. On an 8 GB laptop
+`qwen2.5:3b` gave nearly every job 20-45 and wrote reasons that contradicted the resume. Use
+`jobagent rank --no-llm` unless you have 16 GB+ RAM (for a 7B+ model) or a strong cloud model.
+`llm.weight` (default 0.3) sets how much the AI can move a score, and a job capped by a rule (for
+example "asks for 4+ years, you have 1") stays capped whatever the AI says.
+
 ## Privacy and safety
 - Your config, resume, database and reports are gitignored. Check with `git status` before pushing.
 - Job text is treated as untrusted: contact details are stripped, it is never rendered as HTML, and it

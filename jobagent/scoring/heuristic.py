@@ -23,6 +23,8 @@ _JUNIOR = ("intern", "junior", "jr.", "trainee", "graduate", "entry level", "fre
 @dataclass
 class Scored:
     score: int
+    # Hard ceiling from a rule (title mismatch, too many years asked); blending must keep it.
+    max_score: int = 100
     reasons: list[str] = field(default_factory=list)
     red_flags: list[str] = field(default_factory=list)
 
@@ -104,11 +106,13 @@ def score_job(job: Job, profile: Profile, flt: FilterResult) -> Scored:
     if role_pts == 0:
         # Skills and location alone must not rescue a job whose title is a different role.
         total = min(total, 30)
+        out.max_score = 30
         out.red_flags.append("title does not match your target roles")
 
     need = _years_asked(job)
     if need is not None and need > profile.experience_years + _YEARS_SLACK:
         total = min(total, _OVER_YEARS_CAP)
+        out.max_score = min(out.max_score, _OVER_YEARS_CAP)
         out.red_flags.append(
             f"asks for {need}+ years, you have {profile.experience_years} "
             f"(score capped at {_OVER_YEARS_CAP})"

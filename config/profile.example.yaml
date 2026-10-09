@@ -55,3 +55,4 @@ llm:
   model: ""
   base_url: ""
   top_n: 30                     # at most this many jobs per run are sent to the AI
+  weight: 0.3                   # share of the final score from the AI (0-1); the rest is the free score

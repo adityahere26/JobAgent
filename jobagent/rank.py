@@ -10,9 +10,6 @@ from jobagent.llm import LLMClient, LLMError
 from jobagent.scoring.heuristic import score_job
 from jobagent.scoring.llm_scorer import llm_score, profile_hash
 
-HEURISTIC_WEIGHT = 0.4
-LLM_WEIGHT = 0.6
-
 
 @dataclass
 class Ranked:
@@ -21,6 +18,26 @@ class Ranked:
     reasons: list[str] = field(default_factory=list)
     red_flags: list[str] = field(default_factory=list)
     llm_used: bool = False
+    max_score: int = 100
+
+
+def blend(heuristic: int, llm: int, weight: float, max_score: int = 100) -> int:
+    """(1-w)*heuristic + w*llm, never above the heuristic's rule cap (e.g. 45 for years)."""
+    return min(round((1 - weight) * heuristic + weight * llm), max_score)
+
+
+def order(ranked: list[Ranked]) -> list[Ranked]:
+    """Best first. If any job was LLM-scored, those at or above the best unscored job lead.
+
+    Jobs outside top_n were never shown to the model, so on a tie they go below scored ones.
+    """
+    by_score = sorted(ranked, key=lambda r: (-r.score, -r.job.id))
+    if not any(r.llm_used for r in ranked):
+        return by_score
+    best_unscored = max((r.score for r in ranked if not r.llm_used), default=-1)
+    lead = [r for r in by_score if r.llm_used and r.score >= best_unscored]
+    lead_ids = {id(r) for r in lead}
+    return lead + [r for r in by_score if id(r) not in lead_ids]
 
 
 @dataclass
@@ -51,7 +68,7 @@ def rank_jobs(
         store.save_score(
             conn, job.id, "heuristic", s.score, s.reasons, s.red_flags, job.content_hash, ""
         )
-        ranked.append(Ranked(job, s.score, s.reasons, s.red_flags))
+        ranked.append(Ranked(job, s.score, s.reasons, s.red_flags, max_score=s.max_score))
 
     ranked.sort(key=lambda r: (-r.score, -r.job.id))
 
@@ -88,11 +105,11 @@ def rank_jobs(
                     phash,
                 )
                 stats.llm_scored += 1
-            item.score = round(HEURISTIC_WEIGHT * item.score + LLM_WEIGHT * verdict["score"])
+            item.score = blend(item.score, verdict["score"], profile.llm.weight, item.max_score)
             item.reasons = verdict["reasons"] or item.reasons
             item.red_flags = list(dict.fromkeys(item.red_flags + verdict["red_flags"]))
             item.llm_used = True
-        ranked.sort(key=lambda r: (-r.score, -r.job.id))
+        ranked = order(ranked)
 
     ranked = [r for r in ranked if r.score >= profile.min_score]
     return ranked, stats

@@ -41,6 +41,8 @@ class LLMConfig(BaseModel):
     model: str = ""
     base_url: str = ""
     top_n: int = Field(default=30, ge=1, le=200)
+    # Share of the final score that comes from the model: final = (1-w)*heuristic + w*llm.
+    weight: float = Field(default=0.3, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _check(self) -> "LLMConfig":
