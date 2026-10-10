@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>{{ title }} · jobagent</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  {% set nav = nav | default("") %}
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="brand" href="/">jobagent</a>
+      <nav aria-label="Main">
+        <a href="/" {% if nav == "jobs" %}aria-current="page"{% endif %}>Jobs</a>
+        <a href="/tracker" {% if nav == "tracker" %}aria-current="page"{% endif %}>Tracker</a>
+        <a href="/add" {% if nav == "add" %}aria-current="page"{% endif %}>Add a job</a>
+      </nav>
+      <form method="post" action="/refresh" class="refresh" id="refresh-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn">Refresh jobs</button>
+      </form>
+    </div>
+    <div class="wrap refresh-panel" id="refresh-panel" hidden>
+      <div role="status" aria-live="polite">
+        <p id="refresh-text" class="refresh-text"></p>
+        <progress id="refresh-progress" max="1" value="0" aria-label="Boards fetched"></progress>
+      </div>
+      <details>
+        <summary>Board by board</summary>
+        <ul id="refresh-log" class="refresh-log"></ul>
+      </details>
+      <a href="/" id="refresh-reload" class="btn btn-quiet" hidden>Show the updated list</a>
+    </div>
+  </header>
+  <main id="main" class="wrap" tabindex="-1">
+    {% if notice | default("") %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

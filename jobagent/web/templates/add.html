@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <h1>Add a job</h1>
+  <p class="muted">For a job you found somewhere else. Copy its text in by hand; nothing is scraped.</p>
+</div>
+{% if errors %}
+<div class="error" role="alert" tabindex="-1" id="form-errors">
+  <p><strong>The job was not added:</strong></p>
+  <ul>{% for where, msg in errors %}<li>{{ where }}: {{ msg }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" action="/add" class="stack narrow-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="field">
+    <label for="a-title">Job title</label>
+    <input id="a-title" name="title" required maxlength="300" value="{{ values.get('title', '') }}">
+  </div>
+  <div class="field">
+    <label for="a-company">Company</label>
+    <input id="a-company" name="company" required maxlength="200" value="{{ values.get('company', '') }}">
+  </div>
+  <div class="field">
+    <label for="a-url">Link to the job or application page</label>
+    <input id="a-url" name="url" type="url" required pattern="https://.*" placeholder="https://" aria-describedby="a-url-hint" value="{{ values.get('url', '') }}">
+    <p class="hint" id="a-url-hint">Must start with https://. Adding the same link again updates the job.</p>
+  </div>
+  <div class="field">
+    <label for="a-loc">Location <span class="muted">(optional)</span></label>
+    <input id="a-loc" name="location" maxlength="300" placeholder="Bengaluru, or Remote, India" value="{{ values.get('location', '') }}">
+  </div>
+  <div class="field">
+    <label for="a-desc">Job description</label>
+    <textarea id="a-desc" name="description" rows="12" aria-describedby="a-desc-hint">{{ values.get('description', '') }}</textarea>
+    <p class="hint" id="a-desc-hint">Paste the full text so skills and experience can be scored. Emails and phone numbers are removed.</p>
+  </div>
+  <div class="row"><button type="submit" class="btn btn-primary">Add job</button></div>
+</form>
+{% endblock %}

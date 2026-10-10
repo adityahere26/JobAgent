@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% macro band(score) %}{% if score >= 70 %}high{% elif score >= 45 %}mid{% else %}low{% endif %}{% endmacro %}
+{% block content %}
+<div class="page-head">
+  <h1>Jobs</h1>
+  <p class="muted">{{ total }} of {{ all_count }} jobs match these filters, best first.</p>
+</div>
+
+<form method="get" action="/" class="filters" role="search" aria-label="Filter jobs">
+  <div class="field grow">
+    <label for="f-q">Search title or company</label>
+    <input id="f-q" name="q" type="search" value="{{ f.q }}" autocomplete="off">
+  </div>
+  <div class="field narrow">
+    <label for="f-min">Min score</label>
+    <input id="f-min" name="min_score" type="number" min="0" max="100" step="5" value="{{ f.min_score }}">
+  </div>
+  <div class="field">
+    <label for="f-city">City</label>
+    <select id="f-city" name="city">
+      <option value="">Any city</option>
+      {% for c in cities %}
+      <option value="{{ c }}" {% if c == f.city %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="f-status">Status</label>
+    <select id="f-status" name="status">
+      <option value="">Any status</option>
+      <option value="new" {% if f.status == "new" %}selected{% endif %}>Not tracked yet</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if s == f.status %}selected{% endif %}>{{ labels[s] }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field check">
+    <input id="f-remote" name="remote" type="checkbox" value="1" {% if f.remote %}checked{% endif %}>
+    <label for="f-remote">Remote only</label>
+  </div>
+  <div class="field actions">
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/" class="btn btn-quiet">Reset</a>
+  </div>
+</form>
+
+{% if rows %}
+<table class="jobs">
+  <caption class="visually-hidden">Matching jobs, highest score first</caption>
+  <thead>
+    <tr>
+      <th scope="col" class="c-score">Score</th>
+      <th scope="col">Role</th>
+      <th scope="col">Location</th>
+      <th scope="col">Watch out</th>
+      <th scope="col" class="c-status">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    {% set job = r.job %}
+    {% set current = job_statuses.get(job.id, "") %}
+    <tr id="job-{{ job.id }}">
+      <td class="c-score" data-label="Score"><span class="score score-{{ band(r.score) }}">{{ r.score }}</span></td>
+      <td class="c-role">
+        <a class="title" href="/jobs/{{ job.id }}">{{ job.title }}</a>
+        <span class="company">{{ job.company }}</span>
+      </td>
+      <td class="c-loc" data-label="Location">
+        {{ job.location_text or "Not stated" }}
+        {% if job.is_remote %}<span class="tag">Remote</span>{% endif %}
+      </td>
+      <td class="c-flags" data-label="Watch out">
+        {% if r.red_flags %}
+        <ul class="flags">{% for flag in r.red_flags %}<li>{{ flag }}</li>{% endfor %}</ul>
+        {% else %}<span class="muted">None</span>{% endif %}
+      </td>
+      <td class="c-status" data-label="Status">
+        <form method="post" action="/jobs/{{ job.id }}/status" class="quick">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="next" value="{{ here }}#job-{{ job.id }}">
+          {% for s in quick %}
+          <button type="submit" name="status" value="{{ s }}" class="chip"
+                  aria-pressed="{{ 'true' if current == s else 'false' }}"
+                  aria-label="Mark {{ job.title }} at {{ job.company }} as {{ labels[s] | lower }}">{{ labels[s] }}</button>
+          {% endfor %}
+        </form>
+        {% if current and current not in quick %}<span class="badge">{{ labels[current] }}</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if total > shown %}
+<p class="more"><a class="btn btn-quiet" href="/?{{ more_query }}">Show {{ [page_size, total - shown] | min }} more</a></p>
+{% endif %}
+{% else %}
+<div class="empty">
+  <p><strong>No jobs match.</strong></p>
+  <p class="muted">Lower the minimum score, clear the filters, or press “Refresh jobs” to fetch new ones.</p>
+</div>
+{% endif %}
+{% endblock %}

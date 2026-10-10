@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<p class="crumb"><a href="/">← All jobs</a></p>
+<div class="detail-head">
+  <div>
+    <h1>{{ job.title }}</h1>
+    <p class="sub">{{ job.company }} · {{ job.location_text or "Location not stated" }}{% if job.is_remote %} <span class="tag">Remote</span>{% endif %}</p>
+  </div>
+  {% if score is not none %}
+  <p class="score-big"><span class="visually-hidden">Score </span>{{ score }}<span class="of">/100</span></p>
+  {% endif %}
+</div>
+
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<div class="detail-grid">
+  <div class="detail-main">
+    {% if problem %}
+    <p class="error" role="alert">{{ problem }}</p>
+    {% elif hidden %}
+    <section class="panel" aria-labelledby="h-hidden">
+      <h2 id="h-hidden">Hidden by your filters</h2>
+      <p>{{ hidden }}</p>
+    </section>
+    {% else %}
+    <section class="panel" aria-labelledby="h-why">
+      <h2 id="h-why">Why it matches</h2>
+      {% if reasons %}<ul class="plain">{% for r in reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+      {% else %}<p class="muted">No strong match signals.</p>{% endif %}
+      {% if flags %}
+      <h3>Watch out</h3>
+      <ul class="flags">{% for f in flags %}<li>{{ f }}</li>{% endfor %}</ul>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section aria-labelledby="h-desc">
+      <h2 id="h-desc">Job description</h2>
+      {% if job.description %}
+      <div class="description" tabindex="0" aria-label="Job description text">{{ job.description }}</div>
+      {% else %}<p class="muted">No description was saved for this job.</p>{% endif %}
+    </section>
+
+    <section id="tailor" aria-labelledby="h-tailor" class="panel">
+      <h2 id="h-tailor">Tailor your application</h2>
+      <p class="muted">Works with any chat model. Your contact details are removed from the prompt.</p>
+      {% if tailor_error %}<p class="error" role="alert">{{ tailor_error }}</p>{% endif %}
+      <form method="post" action="/jobs/{{ job.id }}/tailor/prompt">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn">{{ "Prepare tailoring again" if prompt else "Prepare tailoring" }}</button>
+      </form>
+      {% if prompt %}
+      <div class="field">
+        <label for="prompt-text">1. Copy this prompt into a chat model you trust</label>
+        <textarea id="prompt-text" rows="10" readonly>{{ prompt }}</textarea>
+        <div class="row">
+          <button type="button" class="btn" data-copy="prompt-text">Copy prompt</button>
+          <span class="muted" data-copy-status="prompt-text" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+      <form method="post" action="/jobs/{{ job.id }}/tailor/import" class="field">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="reply-text">2. Paste the model's whole reply</label>
+        <textarea id="reply-text" name="reply" rows="8" required>{{ reply }}</textarea>
+        <div class="row"><button type="submit" class="btn btn-primary">Check reply</button></div>
+      </form>
+      {% endif %}
+
+      {% if tailored %}
+      <div class="result" aria-labelledby="h-result">
+        <h3 id="h-result">Checked reply</h3>
+        {% for w in tailored.warnings %}<p class="warn"><strong>Check:</strong> {{ w }}</p>{% endfor %}
+        <h4>Summary</h4><p>{{ tailored.summary }}</p>
+        <h4>Your most relevant bullets (verbatim)</h4>
+        <ul class="plain">{% for b in tailored.bullets %}<li>{{ b }}</li>{% endfor %}</ul>
+        <h4>Cover note</h4><p class="pre">{{ tailored.cover_note }}</p>
+      </div>
+      {% elif saved %}
+      <details class="saved">
+        <summary>Saved tailoring for this job</summary>
+        <div class="description">{{ saved }}</div>
+      </details>
+      {% endif %}
+    </section>
+  </div>
+
+  <aside class="detail-side" aria-label="Actions">
+    <section class="panel">
+      <h2>Apply</h2>
+      {% if job.apply_url.startswith("https://") %}
+      <p><a class="btn btn-primary" href="{{ job.apply_url }}" target="_blank" rel="noopener noreferrer">Open job page<span class="visually-hidden"> (new tab)</span></a></p>
+      {% endif %}
+      <form method="post" action="/jobs/{{ job.id }}/apply">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="btn">Open and pre-fill the form</button>
+      </form>
+      <p class="muted small">Pre-fill opens a browser window and fills only what it is sure of. It never submits; you do.</p>
+    </section>
+    <section class="panel">
+      <h2><label for="status-select">Status</label></h2>
+      <form method="post" action="/jobs/{{ job.id }}/status" class="row">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="next" value="/jobs/{{ job.id }}?msg=status">
+        <select id="status-select" name="status">
+          {% if not status %}<option value="" disabled selected>Not tracked yet</option>{% endif %}
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if s == status %}selected{% endif %}>{{ labels[s] }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn">Save</button>
+      </form>
+    </section>
+  </aside>
+</div>
+{% endblock %}

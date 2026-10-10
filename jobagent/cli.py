@@ -1,4 +1,4 @@
-"""Command line: init, fetch, add, rank, show, mark, tailor, apply."""
+"""Command line: init, fetch, add, rank, show, mark, tailor, apply, ui."""
 
 import argparse
 import shutil
@@ -257,6 +257,33 @@ def cmd_apply(paths: Paths, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(paths: Paths, args: argparse.Namespace) -> int:
+    from jobagent.web.security import check_bind_host
+
+    check_bind_host(args.host)  # before anything starts: never listen beyond this machine
+    try:
+        import uvicorn
+
+        from jobagent.web.app import create_app
+    except ImportError:
+        print("The dashboard needs its extra packages: uv sync --extra ui", file=sys.stderr)
+        return 1
+    url = f"http://{args.host}:{args.port}"
+    print(f"jobagent dashboard on {url}  (Ctrl-C to stop)")
+    if not args.no_browser:
+        import threading
+        import webbrowser
+
+        threading.Timer(1.0, webbrowser.open, [url]).start()
+    app = create_app(paths, args.port)
+    # No access log: URLs carry search terms, and nothing about jobs belongs in logs.
+    uvicorn.run(
+        app, host=args.host, port=args.port, log_level="warning", access_log=False,
+        server_header=False,
+    )  # fmt: skip
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jobagent", description="Personal job search agent.")
     p.add_argument("--version", action="version", version=f"jobagent {__version__}")
@@ -292,6 +319,10 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("job_id", type=int)
     m.add_argument("status", choices=store.STATUSES)
     m.add_argument("--note", default="")
+    u = sub.add_parser("ui", help="open the local web dashboard")
+    u.add_argument("--host", default="127.0.0.1", help="must be 127.0.0.1 (local only)")
+    u.add_argument("--port", type=int, default=8000)
+    u.add_argument("--no-browser", action="store_true", help="do not open a browser tab")
     return p
 
 
@@ -308,6 +339,7 @@ def main(argv: list[str] | None = None) -> int:
         "mark": cmd_mark,
         "tailor": cmd_tailor,
         "apply": cmd_apply,
+        "ui": cmd_ui,
     }
     try:
         return handlers[args.command](paths, args)

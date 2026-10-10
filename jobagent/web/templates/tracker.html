@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><h1>Tracker</h1></div>
+<ul class="counts" aria-label="Jobs by status">
+  {% for s in statuses %}
+  <li class="count count-{{ s }}">
+    <a href="#s-{{ s }}"><span class="n">{{ groups[s] | length }}</span><span class="l">{{ labels[s] }}</span></a>
+  </li>
+  {% endfor %}
+</ul>
+{% for s in statuses %}
+<section id="s-{{ s }}" aria-labelledby="h-{{ s }}">
+  <h2 id="h-{{ s }}">{{ labels[s] }} <span class="muted">({{ groups[s] | length }})</span></h2>
+  {% if groups[s] %}
+  <ul class="tracked">
+    {% for t in groups[s] %}
+    <li>
+      <a href="/jobs/{{ t.job.id }}">{{ t.job.title }}</a>
+      <span class="company">{{ t.job.company }}</span>
+      <span class="muted small">since {{ t.updated_at[:10] }}{% if t.note %} · {{ t.note }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">Nothing here yet.</p>{% endif %}
+</section>
+{% endfor %}
+{% endblock %}
