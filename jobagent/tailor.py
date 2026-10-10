@@ -8,6 +8,7 @@ name that is not in your resume, profile, or the job's title/company is flagged.
 import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -230,3 +231,28 @@ def render(job: Job, t: Tailored) -> str:
         "_Review everything. You submit the application._",
     ]
     return "\n".join(lines) + "\n"
+
+
+def prompt_path(reports_dir: Path, job_id: int) -> Path:
+    return reports_dir / "tailored" / f"job-{job_id}.prompt.md"
+
+
+def result_path(reports_dir: Path, job_id: int) -> Path:
+    return reports_dir / "tailored" / f"job-{job_id}.md"
+
+
+def write_prompt(reports_dir: Path, job: Job, prep: Prepared) -> Path:
+    """Save the paste-anywhere prompt for one job. No network."""
+    out = prompt_path(reports_dir, job.id)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_prompt(job, prep), encoding="utf-8")
+    return out
+
+
+def import_reply(reports_dir: Path, job: Job, prep: Prepared, reply: str) -> tuple[Tailored, Path]:
+    """Check a pasted model reply and save the result. Raises ValueError if it is unusable."""
+    result = check_reply(reply, prep)
+    out = result_path(reports_dir, job.id)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render(job, result), encoding="utf-8")
+    return result, out

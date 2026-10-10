@@ -1,7 +1,6 @@
 """Command line: init, fetch, add, rank, show, mark, tailor, apply."""
 
 import argparse
-import hashlib
 import shutil
 import sys
 from pathlib import Path
@@ -21,10 +20,10 @@ from jobagent.config import (
 from jobagent.db import connect
 from jobagent.ingest import ingest_all
 from jobagent.llm import LLMError, make_client
-from jobagent.models import JobIn
+from jobagent.models import manual_job, validation_messages
 from jobagent.rank import rank_jobs
 from jobagent.report import build_report
-from jobagent.tailor import check_reply, prepare, render, render_prompt, tailor
+from jobagent.tailor import import_reply, prepare, render, tailor, write_prompt
 
 EXAMPLES = {
     "profile.example.yaml": "profile.yaml",
@@ -87,23 +86,12 @@ def cmd_add(paths: Paths, args: argparse.Namespace) -> int:
     except OSError as exc:
         print(f"Cannot read the description file: {exc.strerror}", file=sys.stderr)
         return 1
-    url = args.url.strip()
-    fields = {
-        # Same URL -> same id, so adding a job twice updates it instead of duplicating it.
-        "external_id": "url-" + hashlib.sha256(url.encode("utf-8")).hexdigest()[:16],
-        "title": args.title,
-        "company": args.company,
-        "location_text": args.location,
-        "description": description,
-        "apply_url": url,
-    }
     try:
-        job = JobIn.model_validate(fields)
+        job = manual_job(args.title, args.company, args.url, args.location, description)
     except ValidationError as exc:
         print("Job not added:", file=sys.stderr)
-        for err in exc.errors():
-            where = ".".join(str(p) for p in err["loc"]) or "job"
-            print(f"  - {where}: {err['msg']}", file=sys.stderr)
+        for where, msg in validation_messages(exc):
+            print(f"  - {where}: {msg}", file=sys.stderr)
         return 1
     conn = connect(paths.db)
     job_id, outcome = store.add_manual_job(conn, job)
@@ -180,11 +168,8 @@ def _tailor_offline(paths: Paths, args: argparse.Namespace, profile: Profile, re
     except ValueError as exc:
         print(f"Cannot tailor: {exc}", file=sys.stderr)
         return 1
-    out_dir = paths.reports_dir / "tailored"
-    out_dir.mkdir(parents=True, exist_ok=True)
     if args.prompt:
-        out = out_dir / f"job-{job.id}.prompt.md"
-        out.write_text(render_prompt(job, prep), encoding="utf-8")
+        out = write_prompt(paths.reports_dir, job, prep)
         print(f"Saved: {out}")
         print("Paste it into a chat model and save the reply, then run:")
         print(f"  jobagent tailor {job.id} --import reply.txt")
@@ -195,12 +180,10 @@ def _tailor_offline(paths: Paths, args: argparse.Namespace, profile: Profile, re
         print(f"Cannot read the reply file: {exc.strerror}", file=sys.stderr)
         return 1
     try:
-        result = check_reply(reply, prep)
+        result, out = import_reply(paths.reports_dir, job, prep, reply)
     except ValueError as exc:
         print(f"The reply is not usable: {exc}. It must be the JSON object.", file=sys.stderr)
         return 1
-    out = out_dir / f"job-{job.id}.md"
-    out.write_text(render(job, result), encoding="utf-8")
     for w in result.warnings:
         print(f"WARNING: {w}")
     print(f"Saved: {out}")
@@ -263,11 +246,7 @@ def cmd_apply(paths: Paths, args: argparse.Namespace) -> int:
     if job is None:
         print(f"No job with id {args.job_id}.")
         return 1
-    applicant = aa.load_applicant(paths)
-    values = aa.values_for(applicant, aa.read_cover_note(paths, job.id))
-    resume_pdf = applicant.resume_pdf
-    if resume_pdf and not Path(resume_pdf).is_absolute():
-        resume_pdf = str(paths.home / resume_pdf)
+    values, resume_pdf = aa.prepare(paths, job.id)
     print(f"Opening {job.title} at {job.company}. Nothing is submitted for you.")
     filled, left = aa.run(job.apply_url, values, resume_pdf)
     print(f"Pre-filled: {', '.join(filled) or 'nothing'}")

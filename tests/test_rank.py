@@ -81,3 +81,16 @@ def test_rank_jobs_keeps_years_cap_with_enthusiastic_model(conn):
     p = make_profile(experience_years=1, llm={"provider": "ollama", "model": "m", "weight": 1})
     [r], _ = rank_jobs(conn, p, "", Fake(100))
     assert r.llm_used and r.score == 45
+
+
+def test_rank_jobs_without_save_writes_nothing(conn):
+    store.sync_boards(conn, [BoardConfig(source="greenhouse", token="a", company="A")])
+    fields = {
+        "external_id": "1", "title": "Backend Engineer", "company": "A",
+        "location_text": "Bangalore", "description": "Python SQL.",
+        "apply_url": "https://x.example/1",
+    }  # fmt: skip
+    store.upsert_job(conn, 1, JobIn.model_validate(fields), "2026-01-01T00:00:00")
+    [r], _ = rank_jobs(conn, make_profile(), "", None, save=False)
+    assert r.score > 0
+    assert conn.execute("SELECT COUNT(*) FROM scores").fetchone()[0] == 0

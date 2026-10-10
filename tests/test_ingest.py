@@ -80,3 +80,12 @@ def test_expired_job_returns(conn, board, monkeypatch):
     run(conn, monkeypatch, FetchResult([gh_job(1)]))
     run(conn, monkeypatch, FetchResult([gh_job(1), gh_job(2)]))
     assert active(conn) == 2
+
+
+def test_progress_callback_called_per_board(conn, board, monkeypatch):
+    monkeypatch.setattr(
+        GreenhouseAdapter, "fetch", lambda self, t: FetchResult([gh_job(1)], complete=True)
+    )
+    seen = []
+    ingest_all(conn, on_board=lambda o, done, total: seen.append((o.company, done, total)))
+    assert seen == [("Acme", 1, 1)]

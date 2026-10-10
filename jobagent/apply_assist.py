@@ -89,6 +89,16 @@ def read_cover_note(paths: Paths, job_id: int) -> str:
     return m.group(1).strip() if m else ""
 
 
+def prepare(paths: Paths, job_id: int) -> tuple[dict[str, str], str]:
+    """Field values and the absolute resume PDF path for one job. Raises ConfigError."""
+    applicant = load_applicant(paths)
+    values = values_for(applicant, read_cover_note(paths, job_id))
+    resume_pdf = applicant.resume_pdf
+    if resume_pdf and not Path(resume_pdf).is_absolute():
+        resume_pdf = str(paths.home / resume_pdf)
+    return values, resume_pdf
+
+
 _FIELD_JS = """
 () => [...document.querySelectorAll('input, textarea')].map((el, i) => {
   const label = el.labels && el.labels.length ? [...el.labels].map(l => l.innerText).join(' ') : '';

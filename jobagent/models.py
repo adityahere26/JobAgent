@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
 from jobagent.clean import clean_description, clean_line, validate_https_url
 from jobagent.locations import normalize_location
@@ -107,3 +107,26 @@ class JobIn(BaseModel):
             ensure_ascii=False,
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def manual_job(title: str, company: str, url: str, location: str | None, description: str) -> JobIn:
+    """A job the user found elsewhere and pasted in. Raises pydantic.ValidationError.
+
+    Same URL -> same id, so adding a job twice updates it instead of duplicating it.
+    """
+    url = url.strip()
+    return JobIn.model_validate(
+        {
+            "external_id": "url-" + hashlib.sha256(url.encode("utf-8")).hexdigest()[:16],
+            "title": title,
+            "company": company,
+            "location_text": location,
+            "description": description,
+            "apply_url": url,
+        }
+    )
+
+
+def validation_messages(exc: ValidationError) -> list[tuple[str, str]]:
+    """(field, message) pairs for the user. Never includes the submitted value."""
+    return [(".".join(str(p) for p in e["loc"]) or "job", e["msg"]) for e in exc.errors()]

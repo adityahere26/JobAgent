@@ -55,7 +55,9 @@ def rank_jobs(
     profile: Profile,
     resume: str,
     client: LLMClient | None,
+    save: bool = True,
 ) -> tuple[list[Ranked], RankStats]:
+    """Filter and score active jobs. With save=False nothing is written (used by the web UI)."""
     stats = RankStats()
     ranked: list[Ranked] = []
     for job in store.load_active_jobs(conn):
@@ -65,9 +67,10 @@ def rank_jobs(
             stats.filtered += 1
             continue
         s = score_job(job, profile, flt)
-        store.save_score(
-            conn, job.id, "heuristic", s.score, s.reasons, s.red_flags, job.content_hash, ""
-        )
+        if save:
+            store.save_score(
+                conn, job.id, "heuristic", s.score, s.reasons, s.red_flags, job.content_hash, ""
+            )
         ranked.append(Ranked(job, s.score, s.reasons, s.red_flags, max_score=s.max_score))
 
     ranked.sort(key=lambda r: (-r.score, -r.job.id))

@@ -1,6 +1,7 @@
 """Fetch every enabled board and store the jobs, expiring missing ones only after a trusted run."""
 
 import sqlite3
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -88,18 +89,23 @@ def ingest_board(
     return BoardOutcome(board["company"], status, counts)
 
 
-def ingest_all(conn: sqlite3.Connection) -> list[BoardOutcome]:
+def ingest_all(
+    conn: sqlite3.Connection,
+    on_board: Callable[[BoardOutcome, int, int], None] | None = None,
+) -> list[BoardOutcome]:
     """Download up to MAX_PARALLEL boards at once, then store each on this thread, in order.
 
     Each board's run starts when the parallel fetch starts; that time is its "unseen" cut-off.
+    `on_board(outcome, done, total)` is called after each board is stored.
     """
     boards = store.enabled_boards(conn)
     starts = {b["id"]: now_iso() for b in boards}
+    outcomes: list[BoardOutcome] = []
     with ThreadPoolExecutor(max_workers=MAX_PARALLEL, thread_name_prefix="board") as pool:
         downloads = pool.map(fetch_board, boards)
-        outcomes = [
-            ingest_board(conn, b, fetched, starts[b["id"]])
-            for b, fetched in zip(boards, downloads, strict=True)
-        ]
+        for b, fetched in zip(boards, downloads, strict=True):
+            outcomes.append(ingest_board(conn, b, fetched, starts[b["id"]]))
+            if on_board is not None:
+                on_board(outcomes[-1], len(outcomes), len(boards))
     store.expire_stale(conn)
     return outcomes
