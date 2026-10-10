@@ -299,3 +299,25 @@ section[id^="s-"] { margin-bottom: 28px; }
 .suggestions .grow { flex: 1 1 320px; }
 .suggested { font-size: var(--t-sm); }
 .row.tight { margin-top: 0; gap: 4px; }
+
+/* apply queue */
+.queue-bar { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.queue-bar p { margin: 0; flex: 1 1 280px; }
+.c-pick { width: 1%; }
+.c-pick input { margin-top: 6px; }
+.queue-now { margin-bottom: 20px; }
+.queue-message.error { margin-bottom: 12px; }
+.queue-list { list-style: none; margin: 0; padding: 0; background: var(--surface);
+              border: 1px solid var(--line); border-radius: var(--radius); counter-reset: q; }
+.queue-list li { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px;
+                 border-bottom: 1px solid var(--line); counter-increment: q; }
+.queue-list li::before { content: counter(q); color: var(--muted); font-variant-numeric: tabular-nums;
+                         min-width: 1.5em; }
+.queue-list li:last-child { border-bottom: 0; }
+.queue-list li.is-current { background: var(--accent-weak); }
+.queue-list .grow { flex: 1; }
+.queue-list .grow p { margin: 4px 0 0; }
+.queue-list .badge { margin-top: 0; white-space: nowrap; }
+@media (max-width: 820px) {
+  .jobs td.c-pick { float: left; padding-right: 0; }
+}

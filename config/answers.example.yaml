@@ -1,0 +1,11 @@
+# Reusable answers for common application questions. Stays on your machine (gitignored).
+# Copy to config/answers.yaml. Leave a value empty and that question is left for you to answer.
+# Only text boxes are filled; dropdowns, checkboxes and consent questions are always yours.
+notice_period: ""          # e.g. "30 days" or "Immediately"
+expected_salary: ""        # e.g. "12 LPA" (some people prefer to leave this empty)
+current_salary: ""
+relocation: ""             # e.g. "Yes, open to relocating within India"
+work_authorization: ""     # e.g. "Indian citizen, authorised to work in India"
+requires_sponsorship: ""   # e.g. "No"
+years_experience: ""       # e.g. "1"
+heard_about: ""            # e.g. "Company careers page"

@@ -19,8 +19,16 @@ from jobagent.config import Paths
         ("LinkedIn Profile", "linkedin"),
         ("Why do you want to join us?", "cover_note"),
         ("Full name", "full_name"),
-        ("Are you authorized to work in India?", None),
-        ("Expected salary", None),
+        ("Are you authorized to work in India?", "work_authorization"),
+        ("Expected salary", "expected_salary"),
+        ("Expected CTC (LPA)", "expected_salary"),
+        ("Notice period", "notice_period"),
+        ("Are you willing to relocate to our office location?", "relocation"),
+        ("Will you now or in future require visa sponsorship?", "requires_sponsorship"),
+        ("Years of relevant experience", "years_experience"),
+        ("How did you hear about us?", "heard_about"),
+        ("Current location", "location"),
+        ("Gender", None),
     ],
 )
 def test_match_field(label, key):

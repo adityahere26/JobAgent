@@ -47,6 +47,18 @@ prompt and check the model's reply, add a job by hand, see your tracker, and ref
 live progress. It listens on 127.0.0.1 only, loads nothing from the internet, and never submits
 an application: "pre-fill" opens the form for you to finish and send.
 
+### Apply queue (you submit)
+
+Tick up to 10 jobs on the dashboard and press **Apply queue**. One browser window opens each form
+in turn and pre-fills what it is sure of from `config/applicant.yaml` and `config/answers.yaml`
+(notice period, expected salary, relocation, work authorisation and so on: copy
+`config/answers.example.yaml`; empty answers are left for you). Check every field, submit it
+yourself, then press **I submitted it** (or **Skip**) and the next one opens. Closing the tab
+skips it, and a site's own "application received" page counts as submitted.
+
+It never presses Submit, never ticks consent or other checkboxes, never touches dropdowns, and
+stops with a message if a CAPTCHA or a sign-in page appears.
+
 ## Gmail reply tracker (optional, read-only)
 
 `jobagent mail check` reads the last 30 days of your Gmail, finds replies to jobs you marked

@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from jobagent import apply_assist as aa
 from jobagent import store
+from jobagent.apply_queue import MAX_JOBS, ApplyQueue, open_browser
 from jobagent.config import ConfigError, Paths, Profile, load_profile, read_resume
 from jobagent.db import connect
 from jobagent.filters import apply_filters
@@ -28,7 +29,7 @@ from jobagent.models import manual_job, validation_messages
 from jobagent.rank import Ranked, rank_jobs
 from jobagent.scoring.heuristic import score_job
 from jobagent.tailor import Tailored, import_reply, prepare, prompt_path, result_path, write_prompt
-from jobagent.web.security import GuardMiddleware, csrf_form, new_csrf_token
+from jobagent.web.security import FormFields, GuardMiddleware, csrf_form, new_csrf_token
 from jobagent.web.tasks import FetchTask, Launcher, start_thread
 
 HERE = Path(__file__).parent
@@ -52,10 +53,11 @@ MESSAGES = {
     "apply-opened": "Opening the form in a browser window. Review it and submit it yourself.",
     "suggestion-confirmed": "Status updated from the email reply.",
     "suggestion-dismissed": "Suggestion dismissed.",
+    "queue-empty": "Tick the jobs you want in the apply queue first.",
     "refresh-started": "Refreshing jobs. This page will not update by itself; reload when done.",
 }
 
-Form = Annotated[dict[str, str], Depends(csrf_form)]
+Form = Annotated[FormFields, Depends(csrf_form)]
 
 
 def browser_helper_installed() -> bool:
@@ -135,7 +137,12 @@ class RankCache:
             return self._ranked
 
 
-def create_app(paths: Paths, port: int = 8000, launch: Launcher = start_thread) -> FastAPI:
+def create_app(
+    paths: Paths,
+    port: int = 8000,
+    launch: Launcher = start_thread,
+    queue_browser=open_browser,
+) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(GuardMiddleware, port=port)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
@@ -143,6 +150,7 @@ def create_app(paths: Paths, port: int = 8000, launch: Launcher = start_thread) 
     env = build_env()
     cache = RankCache()
     fetch = FetchTask(paths, launch)
+    app.state.queue = apply_queue = ApplyQueue(paths, launch, queue_browser)
 
     def get_conn() -> Iterator[sqlite3.Connection]:
         conn = connect(paths.db)
@@ -221,6 +229,7 @@ def create_app(paths: Paths, port: int = 8000, launch: Launcher = start_thread) 
             cities=cities,
             job_statuses=statuses,
             quick=QUICK_STATUSES,
+            max_jobs=MAX_JOBS,
             here=here,
             more_query=more_query,
             notice=notice(msg),
@@ -393,6 +402,50 @@ def create_app(paths: Paths, port: int = 8000, launch: Launcher = start_thread) 
             raise HTTPException(400, str(exc)) from exc
         msg = "suggestion-confirmed" if action == "confirm" else "suggestion-dismissed"
         return RedirectResponse(f"/tracker?msg={msg}", status_code=303)
+
+    @app.post("/queue", response_model=None)
+    def queue_start(form: Form, conn: Conn) -> HTMLResponse | RedirectResponse:
+        ids = list(dict.fromkeys(parse_int(v, 0, 0, 2**62) for v in form.getlist("job")))
+        if not ids:
+            return RedirectResponse("/?msg=queue-empty", status_code=303)
+        error = ""
+        if len(ids) > MAX_JOBS:
+            error = f"Pick at most {MAX_JOBS} jobs for one queue (you picked {len(ids)})."
+        elif not browser_helper_installed():
+            error = "Install the browser helper first: uv sync --extra apply --extra ui"
+        else:
+            jobs = [j for i in ids if (j := store.get_job(conn, i))]
+            try:
+                apply_queue.start(jobs)
+            except (ValueError, ConfigError) as exc:
+                error = str(exc)
+        if error:
+            return queue_view(400, error)
+        return RedirectResponse("/queue", status_code=303)
+
+    def queue_view(status_code: int = 200, error: str = "") -> HTMLResponse:
+        return page(
+            "queue.html",
+            status_code,
+            title="Apply queue",
+            nav="queue",
+            q=apply_queue.snapshot(),
+            error=error,
+            max_jobs=MAX_JOBS,
+        )
+
+    @app.get("/queue", response_class=HTMLResponse)
+    def queue_page() -> HTMLResponse:
+        return queue_view()
+
+    @app.get("/queue/status")
+    def queue_status() -> JSONResponse:
+        return JSONResponse(apply_queue.snapshot())
+
+    @app.post("/queue/command")
+    def queue_command(form: Form) -> RedirectResponse:
+        apply_queue.command(form.get("command", ""))
+        return RedirectResponse("/queue", status_code=303)
 
     @app.post("/refresh", response_model=None)
     def refresh(request: Request, form: Form) -> JSONResponse | RedirectResponse:

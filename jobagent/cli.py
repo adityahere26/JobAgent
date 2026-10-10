@@ -30,6 +30,7 @@ EXAMPLES = {
     "companies.example.yaml": "companies.yaml",
     "resume.example.md": "resume.md",
     "applicant.example.yaml": "applicant.yaml",
+    "answers.example.yaml": "answers.yaml",
 }
 
 

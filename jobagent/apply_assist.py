@@ -14,8 +14,41 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from jobagent.config import ConfigError, Paths
 
-# Ordered: the first rule whose pattern matches a field's label text wins.
+# Ordered: the first rule whose pattern matches a field's label text wins. Reusable answers from
+# config/answers.yaml come first so "Willing to relocate to our office location?" is not a location.
 RULES: list[tuple[str, re.Pattern[str]]] = [
+    (
+        "notice_period",
+        re.compile(
+            r"notice\s*period|how soon can you (join|start)|earliest (start|joining)|"
+            r"joining\s*time",
+            re.I,
+        ),
+    ),
+    (
+        "expected_salary",
+        re.compile(
+            r"expected\s*(salary|ctc|compensation|pay)|salary\s*expectations?|"
+            r"desired\s*(salary|compensation)",
+            re.I,
+        ),
+    ),
+    ("current_salary", re.compile(r"current\s*(salary|ctc|compensation)", re.I)),
+    ("relocation", re.compile(r"relocat", re.I)),
+    ("requires_sponsorship", re.compile(r"sponsor", re.I)),
+    (
+        "work_authorization",
+        re.compile(
+            r"authori[sz]ed to work|work\s*authori[sz]ation|right to work|"
+            r"legally (allowed|eligible) to work",
+            re.I,
+        ),
+    ),
+    (
+        "years_experience",
+        re.compile(r"years\s*of\s*(\w+\s+){0,2}experience|total\s*experience", re.I),
+    ),
+    ("heard_about", re.compile(r"how did you (hear|find|learn)|where did you (hear|find)", re.I)),
     ("first_name", re.compile(r"first\s*name|given\s*name|\bfname\b", re.I)),
     ("last_name", re.compile(r"last\s*name|sur\s*name|family\s*name|\blname\b", re.I)),
     ("email", re.compile(r"e-?mail", re.I)),
@@ -55,6 +88,33 @@ class Applicant(BaseModel):
         return f"{self.first_name} {self.last_name}".strip()
 
 
+class Answers(BaseModel):
+    """Reusable answers for common form questions (config/answers.yaml). Empty = left for you."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    notice_period: str = ""
+    expected_salary: str = ""
+    current_salary: str = ""
+    relocation: str = ""
+    work_authorization: str = ""
+    requires_sponsorship: str = ""
+    years_experience: str = ""
+    heard_about: str = ""
+
+
+def load_answers(paths: Paths) -> Answers:
+    """Answers from config/answers.yaml; none if the file does not exist (it is optional)."""
+    path = paths.config_dir / "answers.yaml"
+    if not path.is_file():
+        return Answers()
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        return Answers.model_validate({k: "" if v is None else str(v) for k, v in data.items()})
+    except (yaml.YAMLError, ValueError, AttributeError) as exc:
+        raise ConfigError(f"answers.yaml is invalid: {type(exc).__name__}") from exc
+
+
 def load_applicant(paths: Paths) -> Applicant:
     path = paths.config_dir / "applicant.yaml"
     if not path.is_file():
@@ -73,8 +133,11 @@ def match_field(label_text: str) -> str | None:
     return None
 
 
-def values_for(applicant: Applicant, cover_note: str = "") -> dict[str, str]:
-    values = applicant.model_dump()
+def values_for(
+    applicant: Applicant, cover_note: str = "", answers: Answers | None = None
+) -> dict[str, str]:
+    values = (answers or Answers()).model_dump()
+    values.update(applicant.model_dump())
     values["full_name"] = applicant.full_name
     values["cover_note"] = cover_note
     return {k: v for k, v in values.items() if v}
@@ -92,7 +155,7 @@ def read_cover_note(paths: Paths, job_id: int) -> str:
 def prepare(paths: Paths, job_id: int) -> tuple[dict[str, str], str]:
     """Field values and the absolute resume PDF path for one job. Raises ConfigError."""
     applicant = load_applicant(paths)
-    values = values_for(applicant, read_cover_note(paths, job_id))
+    values = values_for(applicant, read_cover_note(paths, job_id), load_answers(paths))
     resume_pdf = applicant.resume_pdf
     if resume_pdf and not Path(resume_pdf).is_absolute():
         resume_pdf = str(paths.home / resume_pdf)

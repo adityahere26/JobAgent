@@ -45,10 +45,16 @@
 </form>
 
 {% if rows %}
+<form method="post" action="/queue" id="queue-form" class="queue-bar">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button type="submit" class="btn btn-primary">Apply queue</button>
+  <p class="muted small" id="queue-hint">Tick up to {{ max_jobs }} jobs. Each form opens and is pre-filled in turn; you check it and submit it yourself.</p>
+</form>
 <table class="jobs">
   <caption class="visually-hidden">Matching jobs, highest score first</caption>
   <thead>
     <tr>
+      <th scope="col" class="c-pick"><span class="visually-hidden">Add to apply queue</span></th>
       <th scope="col" class="c-score">Score</th>
       <th scope="col">Role</th>
       <th scope="col">Location</th>
@@ -61,6 +67,11 @@
     {% set job = r.job %}
     {% set current = job_statuses.get(job.id, "") %}
     <tr id="job-{{ job.id }}">
+      <td class="c-pick">
+        <input type="checkbox" name="job" value="{{ job.id }}" form="queue-form" id="pick-{{ job.id }}"
+               aria-describedby="queue-hint">
+        <label for="pick-{{ job.id }}" class="visually-hidden">Add {{ job.title }} at {{ job.company }} to the apply queue</label>
+      </td>
       <td class="c-score" data-label="Score"><span class="score score-{{ band(r.score) }}">{{ r.score }}</span></td>
       <td class="c-role">
         <a class="title" href="/jobs/{{ job.id }}">{{ job.title }}</a>

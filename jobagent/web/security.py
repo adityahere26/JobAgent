@@ -71,11 +71,22 @@ class GuardMiddleware(BaseHTTPMiddleware):
         return response
 
 
-async def csrf_form(request: Request) -> dict[str, str]:
+class FormFields(dict[str, str]):
+    """First value of each field; getlist() gives every value (e.g. several ticked checkboxes)."""
+
+    def __init__(self, lists: dict[str, list[str]]) -> None:
+        super().__init__({k: v[0] for k, v in lists.items()})
+        self._lists = lists
+
+    def getlist(self, key: str) -> list[str]:
+        return list(self._lists.get(key, []))
+
+
+async def csrf_form(request: Request) -> FormFields:
     """Parse a urlencoded POST body and check its CSRF token. Every POST route depends on this.
 
-    Returns the fields (first value of each). The token may come in the form or, for scripts,
-    in the X-CSRF-Token header.
+    Returns the fields (first value of each; getlist() for repeated ones). The token may come
+    in the form or, for scripts, in the X-CSRF-Token header.
     """
     ctype = request.headers.get("content-type", "").split(";")[0].strip()
     if ctype != "application/x-www-form-urlencoded":
@@ -84,7 +95,7 @@ async def csrf_form(request: Request) -> dict[str, str]:
     if len(body) > MAX_FORM_BYTES:
         raise HTTPException(413, "That is too much text.")
     parsed = parse_qs(body.decode("utf-8", errors="replace"), keep_blank_values=True)
-    fields = {k: v[0] for k, v in parsed.items()}
+    fields = FormFields(parsed)
     sent = fields.pop("csrf", "") or request.headers.get("x-csrf-token", "")
     expected: str = request.app.state.csrf
     if not hmac.compare_digest(sent.encode(), expected.encode()):

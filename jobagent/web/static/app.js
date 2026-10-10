@@ -96,6 +96,25 @@
     })
     .catch(() => {});
 
+  // Apply queue page: reload when the queue moves on, so buttons always match its state.
+  const live = document.getElementById("queue-live");
+  if (live && live.dataset.running === "true") {
+    const pollQueue = async () => {
+      try {
+        const res = await fetch("/queue/status", { headers: { Accept: "application/json" } });
+        const q = await res.json();
+        if (String(q.version) !== live.dataset.version) {
+          location.reload();
+          return;
+        }
+      } catch {
+        // the server restarted; keep the page as it is
+      }
+      setTimeout(pollQueue, 1500);
+    };
+    setTimeout(pollQueue, 1500);
+  }
+
   // After a failed add, move focus to the error summary.
   const errors = document.getElementById("form-errors");
   if (errors) errors.focus();

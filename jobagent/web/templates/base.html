@@ -18,6 +18,7 @@
       <nav aria-label="Main">
         <a href="/" {% if nav == "jobs" %}aria-current="page"{% endif %}>Jobs</a>
         <a href="/tracker" {% if nav == "tracker" %}aria-current="page"{% endif %}>Tracker</a>
+        <a href="/queue" {% if nav == "queue" %}aria-current="page"{% endif %}>Apply queue</a>
         <a href="/add" {% if nav == "add" %}aria-current="page"{% endif %}>Add a job</a>
       </nav>
       <form method="post" action="/refresh" class="refresh" id="refresh-form">

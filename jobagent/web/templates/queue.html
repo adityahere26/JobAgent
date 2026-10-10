@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% set result_labels = {"waiting": "Waiting", "open": "Open now", "applied": "Submitted by you",
+                        "skipped": "Skipped", "blocked": "Stopped: needs you",
+                        "stopped": "Stopped", "not opened": "Not opened"} %}
+{% block content %}
+<div class="page-head">
+  <h1>Apply queue</h1>
+  <p class="muted">Opens each form in a browser window and pre-fills what it is sure of. It never presses Submit and never ticks consent boxes. You check every answer and submit.</p>
+</div>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<div id="queue-live" data-version="{{ q.version }}" data-running="{{ 'true' if q.running else 'false' }}">
+{% if q["items"] %}
+  <section class="panel queue-now" aria-labelledby="h-now">
+    <h2 id="h-now">{% if q.running %}Now{% else %}Last queue{% endif %}</h2>
+    <p class="queue-message {{ 'error' if q.phase == 'blocked' else '' }}" role="status" aria-live="polite">{{ q.message }}</p>
+    {% if q.running %}
+    <form method="post" action="/queue/command" class="row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if q.phase == "waiting" %}
+      <button type="submit" name="command" value="submitted" class="btn btn-primary">I submitted it, next</button>
+      <button type="submit" name="command" value="skip" class="btn">Skip</button>
+      {% endif %}
+      <button type="submit" name="command" value="stop" class="btn btn-quiet">Stop{% if q.phase == "blocked" %} and close the browser{% endif %}</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <ol class="queue-list">
+    {% for item in q["items"] %}
+    <li class="{{ 'is-current' if loop.index0 == q.current and q.running else '' }}">
+      <div class="grow">
+        <a href="/jobs/{{ item.job_id }}">{{ item.title }}</a>
+        <span class="company">{{ item.company }}</span>
+        {% if item.filled or item.left %}
+        <p class="muted small">
+          Filled: {{ item.filled | join(", ") if item.filled else "nothing" }}.
+          {% if item.left %}Left for you: {{ item.left | join(", ") }}.{% endif %}
+        </p>
+        {% endif %}
+      </div>
+      <span class="badge">{{ result_labels.get(item.result, item.result) }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <div class="empty">
+    <p><strong>No queue yet.</strong></p>
+    <p class="muted">On the <a href="/">jobs list</a>, tick up to {{ max_jobs }} jobs and press “Apply queue”.</p>
+    <p class="muted small">Pre-fill uses <code>config/applicant.yaml</code> and, if present, <code>config/answers.yaml</code>.</p>
+  </div>
+{% endif %}
+</div>
+{% endblock %}

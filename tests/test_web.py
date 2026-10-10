@@ -304,3 +304,36 @@ def test_tracker_shows_mail_suggestion_with_confirm(client, app, home):
     assert store.get_statuses(db(home))[2] == "interview"
     assert "Replies to check" not in client.get("/tracker").text
     assert post(client, app, "/tracker/suggestion", form).status_code == 400  # already resolved
+
+
+def test_apply_queue_from_the_jobs_list(home, monkeypatch):
+    from tests.test_apply_queue import FORM, Deferred, FakeBrowser, FakePage
+
+    launch, browser = Deferred(), FakeBrowser([FakePage(FORM), FakePage(FORM)])
+    app = web.create_app(Paths(home), 8000, launch=launch, queue_browser=browser)
+    client = TestClient(app, base_url=BASE)
+    monkeypatch.setattr(web, "browser_helper_installed", lambda: True)
+    page = client.get("/").text
+    assert 'form="queue-form"' in page and "Apply queue" in page
+
+    def start(ids):
+        body = {"csrf": app.state.csrf, "job": [str(i) for i in ids]}
+        return client.post("/queue", data=body, headers=ORIGIN, follow_redirects=False)
+
+    assert start([]).headers["location"] == "/?msg=queue-empty"
+    too_many = start(range(1, 12))
+    assert too_many.status_code == 400 and "at most 10" in too_many.text
+
+    r = start([1, 2])
+    assert r.status_code == 303 and r.headers["location"] == "/queue"
+    queue_page = client.get("/queue").text
+    assert "Product Manager" in queue_page and "Bluefin Tea" in queue_page
+    assert 'data-running="true"' in queue_page
+    for command in ("submitted", "skip"):
+        sent = post(client, app, "/queue/command", {"command": command})
+        assert sent.status_code == 303
+    launch.target()  # run the queue's thread body now
+    status = client.get("/queue/status").json()
+    assert [i["result"] for i in status["items"]] == ["applied", "skipped"]
+    assert store.get_statuses(db(home)) == {1: "applied"}
+    assert "Submitted by you" in client.get("/queue").text
