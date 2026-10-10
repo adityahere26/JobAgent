@@ -1,4 +1,4 @@
-"""Command line: init, fetch, add, rank, show, mark, tailor, apply, ui."""
+"""Command line: init, fetch, add, rank, show, mark, tailor, apply, ui, mail."""
 
 import argparse
 import shutil
@@ -284,6 +284,32 @@ def cmd_ui(paths: Paths, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mail(paths: Paths, args: argparse.Namespace) -> int:
+    from jobagent import mail
+
+    if args.mail_command == "setup":
+        print(f"Opening Google sign-in. Access asked for: {mail.SCOPE} (read-only).")
+        out = mail.setup(paths)
+        print(f"Saved the read-only token to {out} (only you can read it).")
+        print("Next: jobagent mail check")
+        return 0
+    client = mail.GmailClient(mail.access_token(paths))
+    conn = connect(paths.db)
+    messages = client.recent_messages()
+    new = mail.suggest(conn, messages)
+    print(f"Read {len(messages)} messages from the last {mail.DAYS} days (headers only).")
+    if not new:
+        print("No new replies matched jobs you marked applied.")
+        return 0
+    for s in new:
+        job = s.job
+        what = f"{job.title} at {job.company}" if job else f"job {s.job_id}"
+        print(f"  job {s.job_id} {what}: {s.suggested_status} "
+              f"(email from {s.sender_domain or 'unknown'}, {s.received_on})")  # fmt: skip
+    print("Confirm or dismiss them in the dashboard Tracker (jobagent ui).")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="jobagent", description="Personal job search agent.")
     p.add_argument("--version", action="version", version=f"jobagent {__version__}")
@@ -319,6 +345,10 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("job_id", type=int)
     m.add_argument("status", choices=store.STATUSES)
     m.add_argument("--note", default="")
+    ml = sub.add_parser("mail", help="read-only Gmail check for replies to your applications")
+    ml_sub = ml.add_subparsers(dest="mail_command", required=True)
+    ml_sub.add_parser("setup", help="sign in to Google (gmail.readonly) and save the token")
+    ml_sub.add_parser("check", help="suggest statuses from the last 30 days of email")
     u = sub.add_parser("ui", help="open the local web dashboard")
     u.add_argument("--host", default="127.0.0.1", help="must be 127.0.0.1 (local only)")
     u.add_argument("--port", type=int, default=8000)
@@ -340,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
         "tailor": cmd_tailor,
         "apply": cmd_apply,
         "ui": cmd_ui,
+        "mail": cmd_mail,
     }
     try:
         return handlers[args.command](paths, args)

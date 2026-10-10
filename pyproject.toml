@@ -14,6 +14,8 @@ dependencies = [
 [project.optional-dependencies]
 apply = ["playwright>=1.45"]
 # Local web dashboard (`jobagent ui`). No Node, no build step.
+# Gmail reply tracker (`jobagent mail`): Google's reviewed OAuth desktop flow, not a home-made one.
+mail = ["google-auth-oauthlib>=1.2"]
 ui = ["fastapi>=0.110", "jinja2>=3.1", "uvicorn>=0.29"]
 
 [project.scripts]

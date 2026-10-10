@@ -6,6 +6,10 @@ config/profile.yaml
 config/companies.yaml
 config/resume.md
 config/applicant.yaml
+config/answers.yaml
+# Google OAuth client and tokens (Gmail reply tracker), wherever they end up
+client_secret*.json
+*token*.json
 # Any PDF anywhere in the project (config/resume.pdf, Your_Name_Resume.pdf, ...)
 *.pdf
 data/

@@ -1,6 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="page-head"><h1>Tracker</h1></div>
+{% if suggestions %}
+<section class="panel suggestions" aria-labelledby="h-replies">
+  <h2 id="h-replies">Replies to check <span class="muted">({{ suggestions | length }})</span></h2>
+  <p class="muted small">From <code>jobagent mail check</code>. Only the sender's domain and date were kept, never the email itself. Open your inbox to read it before confirming.</p>
+  <ul class="tracked">
+    {% for s in suggestions %}
+    <li>
+      <span class="grow">
+        <a href="/jobs/{{ s.job.id }}">{{ s.job.title }}</a>
+        <span class="company">{{ s.job.company }}</span>
+        <span class="muted small">email from {{ s.sender_domain or "unknown sender" }} on {{ s.received_on }}</span>
+      </span>
+      <span class="suggested">
+        {% if s.suggested_status == "other" %}A reply arrived{% else %}Looks like: <strong>{{ labels[s.suggested_status] }}</strong>{% endif %}
+      </span>
+      <form method="post" action="/tracker/suggestion" class="row tight">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ s.message_id }}">
+        <input type="hidden" name="job_id" value="{{ s.job_id }}">
+        {% if s.suggested_status != "other" %}
+        <button type="submit" name="action" value="confirm" class="btn btn-primary"
+                aria-label="Confirm {{ labels[s.suggested_status] | lower }} for {{ s.job.title }} at {{ s.job.company }}">Confirm</button>
+        {% endif %}
+        <button type="submit" name="action" value="dismiss" class="btn btn-quiet"
+                aria-label="Dismiss the suggestion for {{ s.job.title }} at {{ s.job.company }}">Dismiss</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 <ul class="counts" aria-label="Jobs by status">
   {% for s in statuses %}
   <li class="count count-{{ s }}">

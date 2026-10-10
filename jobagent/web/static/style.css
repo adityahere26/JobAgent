@@ -291,3 +291,11 @@ section[id^="s-"] { margin-bottom: 28px; }
 @media (prefers-reduced-motion: no-preference) {
   .btn, .chip, nav a, input, select, textarea { transition: background-color 120ms, border-color 120ms, color 120ms; }
 }
+
+/* email reply suggestions */
+.suggestions { margin-bottom: 28px; }
+.suggestions .tracked { border: 0; background: transparent; }
+.suggestions li { align-items: center; padding-left: 0; padding-right: 0; }
+.suggestions .grow { flex: 1 1 320px; }
+.suggested { font-size: var(--t-sm); }
+.row.tight { margin-top: 0; gap: 4px; }

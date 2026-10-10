@@ -287,3 +287,20 @@ def test_refresh_runs_fetch_with_progress(client, app, home, monkeypatch):
     assert status["lines"] == ["Northwind Labs: 1 seen, 1 new, 0 changed"]
     # The list picks up the new job without a restart (the score cache notices the change).
     assert "Backend Engineer" in client.get("/").text
+
+
+def test_tracker_shows_mail_suggestion_with_confirm(client, app, home):
+    from jobagent import mail
+
+    conn = db(home)
+    store.set_status(conn, 2, "applied")
+    reply = mail.Message("m9", "2026-10-06", "Bluefin Tea <hr@bluefin.example>", "Interview", "")
+    mail.suggest(conn, [reply])
+    page = client.get("/tracker").text
+    assert "Replies to check" in page and "bluefin.example" in page and "Confirm" in page
+    form = {"message_id": "m9", "job_id": "2", "action": "confirm"}
+    r = post(client, app, "/tracker/suggestion", form)
+    assert r.status_code == 303
+    assert store.get_statuses(db(home))[2] == "interview"
+    assert "Replies to check" not in client.get("/tracker").text
+    assert post(client, app, "/tracker/suggestion", form).status_code == 400  # already resolved

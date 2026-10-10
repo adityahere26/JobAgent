@@ -4,7 +4,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _MIGRATIONS: dict[int, str] = {
     1: """
@@ -77,6 +77,19 @@ _MIGRATIONS: dict[int, str] = {
         status TEXT NOT NULL,
         note TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL
+    );
+    """,
+    # Gmail reply suggestions. Only ids, dates, sender domains and a status: never email text.
+    2: """
+    CREATE TABLE IF NOT EXISTS mail_suggestions (
+        message_id TEXT NOT NULL,
+        job_id INTEGER NOT NULL REFERENCES jobs(id),
+        received_on TEXT NOT NULL,
+        sender_domain TEXT NOT NULL,
+        suggested_status TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (message_id, job_id)
     );
     """,
 }

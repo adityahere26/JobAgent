@@ -353,3 +353,75 @@ def jobs_fingerprint(conn: sqlite3.Connection) -> tuple:
             "SELECT COUNT(*), MAX(last_seen_at), MAX(id) FROM jobs WHERE expired_at IS NULL"
         ).fetchone()
     )
+
+
+# Suggestions from `jobagent mail check`. "other" means a reply arrived but its meaning is unclear.
+MAIL_STATUSES = ("interview", "rejected", "offer", "other")
+
+
+@dataclass
+class Suggestion:
+    message_id: str
+    job_id: int
+    received_on: str
+    sender_domain: str
+    suggested_status: str
+    job: Job | None = None
+
+
+def known_message_ids(conn: sqlite3.Connection) -> set[str]:
+    """Messages already turned into suggestions (pending, confirmed or dismissed)."""
+    return {r[0] for r in conn.execute("SELECT DISTINCT message_id FROM mail_suggestions")}
+
+
+def save_suggestion(conn: sqlite3.Connection, s: Suggestion) -> bool:
+    """Store a new suggestion. False if this message was already suggested for this job."""
+    if s.suggested_status not in MAIL_STATUSES:
+        raise ValueError(f"suggested status must be one of: {', '.join(MAIL_STATUSES)}")
+    with conn:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO mail_suggestions (message_id, job_id, received_on, "
+            "sender_domain, suggested_status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (s.message_id, s.job_id, s.received_on, s.sender_domain, s.suggested_status, now_iso()),
+        )
+    return cur.rowcount == 1
+
+
+def pending_suggestions(conn: sqlite3.Connection) -> list[Suggestion]:
+    rows = conn.execute(
+        "SELECT * FROM mail_suggestions WHERE state = 'pending' ORDER BY received_on DESC"
+    ).fetchall()
+    out = []
+    for r in rows:
+        out.append(
+            Suggestion(
+                r["message_id"],
+                r["job_id"],
+                r["received_on"],
+                r["sender_domain"],
+                r["suggested_status"],
+                get_job(conn, r["job_id"]),
+            )
+        )
+    return out
+
+
+def resolve_suggestion(
+    conn: sqlite3.Connection, message_id: str, job_id: int, confirm: bool
+) -> None:
+    """Confirm (apply the suggested status) or dismiss one pending suggestion."""
+    row = conn.execute(
+        "SELECT suggested_status FROM mail_suggestions WHERE message_id = ? AND job_id = ? "
+        "AND state = 'pending'",
+        (message_id, job_id),
+    ).fetchone()
+    if row is None:
+        raise ValueError("no such pending suggestion")
+    status = row["suggested_status"]
+    if confirm and status != "other":
+        set_status(conn, job_id, status, "confirmed from an email reply")
+    with conn:
+        conn.execute(
+            "UPDATE mail_suggestions SET state = ? WHERE message_id = ? AND job_id = ?",
+            ("confirmed" if confirm else "dismissed", message_id, job_id),
+        )

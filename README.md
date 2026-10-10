@@ -47,6 +47,36 @@ prompt and check the model's reply, add a job by hand, see your tracker, and ref
 live progress. It listens on 127.0.0.1 only, loads nothing from the internet, and never submits
 an application: "pre-fill" opens the form for you to finish and send.
 
+## Gmail reply tracker (optional, read-only)
+
+`jobagent mail check` reads the last 30 days of your Gmail, finds replies to jobs you marked
+`applied` or `interview` (by company name or the sender's domain), and suggests a status:
+interview, rejected, offer or other. Simple keyword rules, no AI, and no email text is sent
+anywhere or saved: only the message id, date, sender domain and the suggestion are stored. You
+confirm each one in the dashboard Tracker.
+
+One-time setup (about 10 minutes):
+
+1. Open <https://console.cloud.google.com/>, create a project (any name).
+2. **APIs & Services → Library**: enable the **Gmail API**.
+3. **APIs & Services → OAuth consent screen**: choose **External**, fill in an app name and your
+   email, add the scope `https://www.googleapis.com/auth/gmail.readonly` only, and add your own
+   Gmail address under **Test users**. Leave the app in **Testing**.
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID**, type **Desktop app**.
+   Download the JSON and save it as `config/client_secret.json` (gitignored; never share it).
+5. Run:
+
+   ```bash
+   uv sync --extra mail
+   uv run jobagent mail setup   # browser opens; Google warns the app is unverified: that is you
+   uv run jobagent mail check
+   ```
+
+The token is saved in `data/gmail_token.json` (gitignored, readable only by you). Because the app
+is unverified and in Testing, **Google ends the login after 7 days**; when `mail check` says so,
+run `jobagent mail setup` again. To revoke access at any time:
+<https://myaccount.google.com/permissions>.
+
 ## Optional AI ranking
 Without it, ranking is a free offline keyword score. To add an AI opinion on the top N jobs:
 - **Private:** install [Ollama](https://ollama.com), pull a model, set `llm.provider: ollama`.

@@ -50,6 +50,8 @@ MESSAGES = {
     "status": "Status updated.",
     "prompt-ready": "Prompt saved. Copy it into a chat model, then paste the reply below.",
     "apply-opened": "Opening the form in a browser window. Review it and submit it yourself.",
+    "suggestion-confirmed": "Status updated from the email reply.",
+    "suggestion-dismissed": "Suggestion dismissed.",
     "refresh-started": "Refreshing jobs. This page will not update by itself; reload when done.",
 }
 
@@ -366,10 +368,31 @@ def create_app(paths: Paths, port: int = 8000, launch: Launcher = start_thread) 
         return RedirectResponse(f"/jobs/{job_id}?msg={msg}", status_code=303)
 
     @app.get("/tracker", response_class=HTMLResponse)
-    def tracker(conn: Conn) -> HTMLResponse:
+    def tracker(conn: Conn, msg: str = "") -> HTMLResponse:
         tracked = store.tracked_jobs(conn)
         groups = {s: [t for t in tracked if t.status == s] for s in store.STATUSES}
-        return page("tracker.html", title="Tracker", nav="tracker", groups=groups)
+        suggestions = [s for s in store.pending_suggestions(conn) if s.job is not None]
+        return page(
+            "tracker.html",
+            title="Tracker",
+            nav="tracker",
+            groups=groups,
+            suggestions=suggestions,
+            notice=notice(msg),
+        )
+
+    @app.post("/tracker/suggestion")
+    def tracker_suggestion(form: Form, conn: Conn) -> RedirectResponse:
+        action = form.get("action", "")
+        if action not in ("confirm", "dismiss"):
+            raise HTTPException(400, "Unknown action.")
+        job_id = parse_int(form.get("job_id"), 0, 0, 2**62)
+        try:
+            store.resolve_suggestion(conn, form.get("message_id", ""), job_id, action == "confirm")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        msg = "suggestion-confirmed" if action == "confirm" else "suggestion-dismissed"
+        return RedirectResponse(f"/tracker?msg={msg}", status_code=303)
 
     @app.post("/refresh", response_model=None)
     def refresh(request: Request, form: Form) -> JSONResponse | RedirectResponse:
