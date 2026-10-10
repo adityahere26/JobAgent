@@ -327,3 +327,29 @@ def get_statuses(conn: sqlite3.Connection) -> dict[int, str]:
     return {
         r["job_id"]: r["status"] for r in conn.execute("SELECT job_id, status FROM applications")
     }
+
+
+@dataclass
+class Tracked:
+    job: Job
+    status: str
+    note: str
+    updated_at: str
+
+
+def tracked_jobs(conn: sqlite3.Connection) -> list[Tracked]:
+    """Every job with a status, most recently changed first (expired jobs included)."""
+    rows = conn.execute(
+        "SELECT j.*, a.status AS a_status, a.note AS a_note, a.updated_at AS a_updated "
+        "FROM applications a JOIN jobs j ON j.id = a.job_id ORDER BY a.updated_at DESC"
+    ).fetchall()
+    return [Tracked(_job_from_row(r), r["a_status"], r["a_note"], r["a_updated"]) for r in rows]
+
+
+def jobs_fingerprint(conn: sqlite3.Connection) -> tuple:
+    """Changes whenever a fetch, add or expiry changes the active jobs (cache key for scores)."""
+    return tuple(
+        conn.execute(
+            "SELECT COUNT(*), MAX(last_seen_at), MAX(id) FROM jobs WHERE expired_at IS NULL"
+        ).fetchone()
+    )

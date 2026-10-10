@@ -13,6 +13,8 @@ dependencies = [
 
 [project.optional-dependencies]
 apply = ["playwright>=1.45"]
+# Local web dashboard (`jobagent ui`). No Node, no build step.
+ui = ["fastapi>=0.110", "jinja2>=3.1", "uvicorn>=0.29"]
 
 [project.scripts]
 jobagent = "jobagent.cli:main"
@@ -20,6 +22,9 @@ jobagent = "jobagent.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.3",
+    # so the UI tests run in a plain `uv sync`
+    "fastapi>=0.110",
+    "jinja2>=3.1",
     "ruff>=0.6",
 ]
 
