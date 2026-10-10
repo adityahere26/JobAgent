@@ -35,6 +35,18 @@ The job goes through the same cleaning as fetched jobs (contact details removed,
 so `rank`, `show`, `tailor`, `apply` and `mark` work on it. Hand-added jobs are kept until you
 `mark` them; `fetch` never expires them. Adding the same URL again updates the job.
 
+## Dashboard
+
+```bash
+uv sync --extra ui          # add --extra apply for the "pre-fill the form" button
+uv run jobagent ui          # opens http://127.0.0.1:8000  (--port 8001, --no-browser)
+```
+
+Browse and filter your matches, mark statuses in one click, read a job, prepare a tailoring
+prompt and check the model's reply, add a job by hand, see your tracker, and refresh boards with
+live progress. It listens on 127.0.0.1 only, loads nothing from the internet, and never submits
+an application: "pre-fill" opens the form for you to finish and send.
+
 ## Optional AI ranking
 Without it, ranking is a free offline keyword score. To add an AI opinion on the top N jobs:
 - **Private:** install [Ollama](https://ollama.com), pull a model, set `llm.provider: ollama`.
