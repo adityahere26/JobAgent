@@ -269,7 +269,7 @@ def cmd_ui(paths: Paths, args: argparse.Namespace) -> int:
         print("The dashboard needs its extra packages: uv sync --extra ui", file=sys.stderr)
         return 1
     url = f"http://{args.host}:{args.port}"
-    print(f"jobagent dashboard on {url}  (Ctrl-C to stop)")
+    print(f"jobagent dashboard on {url}  (Ctrl-C to stop)", flush=True)
     if not args.no_browser:
         import threading
         import webbrowser
